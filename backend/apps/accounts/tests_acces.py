@@ -57,6 +57,24 @@ class AccesPersonnelTests(APITestCase):
         pirate = User.objects.get(email='pirate@test.sn')
         self.assertEqual((pirate.role, pirate.tribunal), ('citoyen', None))
 
+    def test_inscription_messages_d_erreur_en_francais(self):
+        def inscrire(email, mdp):
+            return self.client.post('/api/auth/register/', {'email': email, 'nom': 'Ndiaye',
+                                                            'password': mdp, 'password2': mdp}, format='json')
+        # Validateurs Django du mot de passe, en français
+        r = inscrire('awa@test.sn', 'abc')
+        self.assertEqual(r.status_code, 400)
+        self.assertTrue(any('trop court' in m for m in r.data['password']), r.data)
+        r = inscrire('awa@test.sn', 'password')
+        self.assertTrue(any('trop courant' in m for m in r.data['password']), r.data)
+        r = inscrire('awa.ndiaye@test.sn', 'awa.ndiaye')
+        self.assertTrue(any('semblable' in m for m in r.data['password']), r.data)
+        # Email déjà utilisé (sans tenir compte des majuscules)
+        r = inscrire('Citoyen@Test.sn', 'Baobab-Dakar-2026')
+        self.assertEqual(r.data['email'], ['Un compte existe déjà avec cette adresse email.'])
+        # Mot de passe valide : compte créé
+        self.assertEqual(inscrire('awa@test.sn', 'Baobab-Dakar-2026').status_code, 201)
+
     # ── 2. Changement obligatoire du mot de passe ──────
     def test_changement_obligatoire_a_la_premiere_connexion(self):
         self._creer_agent()

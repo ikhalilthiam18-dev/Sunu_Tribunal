@@ -1,13 +1,12 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
 import {
   FiGrid, FiCalendar, FiFileText, FiAlertTriangle,
-  FiBarChart2, FiFolder, FiLogOut, FiMenu, FiX,
+  FiBarChart2, FiMenu,
   FiBell, FiMail, FiShield, FiUsers, FiBookOpen, FiArchive
 } from 'react-icons/fi'
 import { useAuth, ROLE_LABELS } from '../../context/AuthContext.jsx'
 import { useCompteurs } from '../../context/CompteursContext.jsx'
-import Logo from '../common/Logo.jsx'
+import { Sidebar, TiroirMobile, useSidebarRepliable } from '../common/SidebarRepliable.jsx'
 import AssistantAdmin from '../admin/AssistantAdmin.jsx'
 import toast from 'react-hot-toast'
 
@@ -36,7 +35,7 @@ export default function AdminLayout() {
   const { user, logout } = useAuth()
   const { compteurs } = useCompteurs()
   const navigate = useNavigate()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const menu = useSidebarRepliable('tribunal')
   const tribunal = user?.tribunal_nom || 'Tous les tribunaux'
 
   const handleLogout = () => {
@@ -45,87 +44,45 @@ export default function AdminLayout() {
     toast.success('Deconnecte avec succes')
   }
 
-  const SidebarContent = () => (
-    <>
-      <div className="p-5 border-b border-white/10">
-        <Logo fond="sombre" size="md" />
-        <p className="text-xs text-white/55 mt-2 uppercase tracking-widest">
-          Administration · {tribunal}
-        </p>
-      </div>
+  // Liens filtrés selon le rôle de l'agent, avec leurs compteurs
+  const liens = navItems
+    .filter(item => !item.roles || item.roles.includes(user?.role))
+    .map(item => ({ ...item, compteur: item.badge ? compteurs[item.badge] : 0 }))
 
-      <div className="p-3 flex-1 overflow-y-auto">
-        <p className="text-xs text-white/55 uppercase tracking-widest px-2 mb-3 font-semibold">
-          Navigation
-        </p>
-        {navItems.filter(item => !item.roles || item.roles.includes(user?.role)).map(item => (
-          <NavLink key={item.to} to={item.to} end={item.exact}
-            onClick={() => setMobileOpen(false)}
-            className={({ isActive }) =>
-              `sidebar-item ${isActive ? 'active' : ''} ${item.urgent ? 'mt-1' : ''}`
-            }>
-            <item.icon className="w-4 h-4 flex-shrink-0" />
-            <span className="flex-1">{item.label}</span>
-            {item.badge && compteurs[item.badge] > 0 && (
-              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-5 text-center ${
-                item.urgent ? 'bg-red-500 text-white' : 'bg-white/20 text-white'
-              }`}>
-                {compteurs[item.badge] > 99 ? '99+' : compteurs[item.badge]}
-              </span>
-            )}
-          </NavLink>
-        ))}
-      </div>
-
-      <div className="p-4 border-t border-white/10">
-        <div className="flex items-center gap-3 mb-3 bg-white/5 rounded-xl p-3">
-          <div className="w-9 h-9 rounded-full bg-gold-400/30 flex items-center justify-center text-gold-400 text-sm font-bold flex-shrink-0">
-            {user?.nom?.[0] || 'A'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">{user?.nom}</p>
-            <p className="text-xs text-white/50 truncate">{ROLE_LABELS[user?.role] || 'Personnel'}</p>
-          </div>
-          <FiShield className="w-4 h-4 text-gold-400 flex-shrink-0" />
-        </div>
-        <button onClick={handleLogout}
-          className="sidebar-item w-full text-white/50 hover:text-white">
-          <FiLogOut className="w-4 h-4" />
-          Deconnexion
-        </button>
-      </div>
-    </>
-  )
+  const proprietesMenu = {
+    couleur: 'bg-navy-700',
+    liens,
+    enTete: `Administration · ${tribunal}`,
+    utilisateur: {
+      initiale: user?.nom?.[0] || 'A',
+      nom: user?.nom,
+      detail: ROLE_LABELS[user?.role] || 'Personnel',
+      avatarClasse: 'bg-gold-400/30 text-gold-400',
+      encadre: true,
+      icone: <FiShield className="w-4 h-4 text-gold-400 flex-shrink-0" />,
+    },
+    onDeconnexion: handleLogout,
+    ...menu,
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
 
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-64 bg-navy-700 flex-shrink-0">
-        <SidebarContent />
-      </aside>
+      {/* Ordinateur : menu repliable (clic sur le logo) */}
+      <Sidebar {...proprietesMenu} />
 
-      {/* Mobile sidebar */}
-      {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-navy-700 flex flex-col z-50 animate-slide-in">
-            <div className="flex justify-end p-4">
-              <button onClick={() => setMobileOpen(false)}>
-                <FiX className="w-6 h-6 text-white/70" />
-              </button>
-            </div>
-            <SidebarContent />
-          </aside>
-        </div>
-      )}
+      {/* Mobile / APK : menu par-dessus la page */}
+      <TiroirMobile ouvert={menu.mobileOuvert} fermer={menu.fermerMobile}>
+        <Sidebar {...proprietesMenu} mobile />
+      </TiroirMobile>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Main : s'élargit automatiquement quand le menu se replie */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
         {/* Topbar */}
         <header className="bg-white border-b border-gray-100 px-4 lg:px-6 py-3 flex items-center justify-between">
-          <button className="lg:hidden" onClick={() => setMobileOpen(true)}>
+          <button className="lg:hidden" onClick={menu.ouvrirMobile}
+            aria-label="Ouvrir le menu" aria-expanded={menu.mobileOuvert}>
             <FiMenu className="w-6 h-6 text-gray-600" />
           </button>
           <div className="hidden lg:block">

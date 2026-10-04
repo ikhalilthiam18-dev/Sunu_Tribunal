@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth, homePathFor, PAGE_MOT_DE_PASSE } from '../context/AuthContext.jsx'
-import { authAPI } from '../services/api.js'
+import { authAPI, messageErreur } from '../services/api.js'
 import Logo from '../components/common/Logo.jsx'
 import toast from 'react-hot-toast'
 import heroDesktop from '../assets/hero-justice.jpg'
@@ -54,11 +54,13 @@ function AuthModal({ mode: initMode, onClose }) {
         setForm(f => ({...f, password: ''}))
       }
     } catch (err) {
-      const data = err.response?.data
-      if (data?.detail) setError(data.detail)
-      else if (data?.email) setError('Email : ' + data.email[0])
-      else if (data?.non_field_errors) setError(data.non_field_errors[0])
-      else setError('Email ou mot de passe incorrect.')
+      if (mode === 'login' && err.response?.status === 401) {
+        // Identifiants refusés (ou compte bloqué) : message unique du serveur, sans détail sur le compte
+        setError(err.response.data?.detail || 'Email ou mot de passe incorrect.')
+      } else {
+        // Inscription (email déjà utilisé, mot de passe refusé...) ou serveur injoignable
+        setError(messageErreur(err))
+      }
     } finally { setLoading(false) }
   }
 

@@ -37,16 +37,31 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     """Inscription publique : réservée aux citoyens (le rôle est forcé côté serveur)."""
-    password  = serializers.CharField(write_only=True, min_length=8)
+    password  = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)
 
     class Meta:
         model  = User
         fields = ['email','nom','prenom','telephone','cni','password','password2']
+        # L'unicité de l'email est vérifiée dans validate_email (message en français clair)
+        extra_kwargs = {'email': {'validators': []}}
+
+    def validate_email(self, email):
+        email = User.objects.normalize_email(email)
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError('Un compte existe déjà avec cette adresse email.')
+        return email
 
     def validate(self, data):
         if data['password'] != data.pop('password2'):
             raise serializers.ValidationError({'password': 'Les mots de passe ne correspondent pas.'})
+        # Mêmes règles que le changement de mot de passe (validateurs Django, messages en français) :
+        # 8 caractères minimum, pas un mot de passe courant, pas trop proche de l'email ou du nom
+        futur = User(email=data.get('email', ''), nom=data.get('nom', ''), prenom=data.get('prenom', ''))
+        try:
+            validate_password(data['password'], futur)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({'password': list(e.messages)})
         return data
 
     def create(self, validated_data):

@@ -1,12 +1,12 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
 import {
   FiHome, FiCalendar, FiFileText, FiMapPin, FiBell,
-  FiAlertTriangle, FiLogOut, FiMenu, FiX, FiMail
+  FiAlertTriangle, FiMenu, FiMail
 } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useCompteurs } from '../../context/CompteursContext.jsx'
 import Logo from '../common/Logo.jsx'
+import { Sidebar, TiroirMobile, useSidebarRepliable } from '../common/SidebarRepliable.jsx'
 import AssistantJuridique from '../common/AssistantJuridique.jsx'
 import toast from 'react-hot-toast'
 
@@ -27,20 +27,11 @@ const bottomNav = [
   { to: '/citoyen/suivi',   icon: FiFileText, label: 'Mes dossiers'        },
 ]
 
-function Pastille({ n }) {
-  if (!n) return null
-  return (
-    <span className="text-xs font-bold px-1.5 py-0.5 rounded-full min-w-5 text-center bg-white/20 text-white">
-      {n > 99 ? '99+' : n}
-    </span>
-  )
-}
-
 export default function CitoyenLayout() {
   const { user, logout } = useAuth()
   const { compteurs } = useCompteurs()
   const navigate = useNavigate()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const menu = useSidebarRepliable('citoyen')
 
   const handleLogout = () => {
     logout()
@@ -48,120 +39,38 @@ export default function CitoyenLayout() {
     toast.success('Deconnecte avec succes')
   }
 
+  const proprietesMenu = {
+    couleur: 'bg-justice-600',
+    liens: navItems.map(item => ({ ...item, compteur: item.badge ? compteurs[item.badge] : 0 })),
+    // Alerte SOS : jamais masquée, même menu replié
+    sos: { to: '/citoyen/sos', label: 'Alerte SOS', icon: FiAlertTriangle },
+    utilisateur: {
+      initiale: user?.nom?.[0] || 'C',
+      nom: user?.nom,
+      detail: user?.email,
+      avatarClasse: 'bg-white/20 text-white',
+    },
+    onDeconnexion: handleLogout,
+    ...menu,
+  }
+
   return (
     <div className="flex h-screen bg-gray-50">
 
-      {/* ── Sidebar desktop ── */}
-      <aside className="hidden lg:flex flex-col w-64 bg-justice-600 text-white flex-shrink-0">
-        <div className="p-5 border-b border-white/10">
-          <Logo fond="sombre" size="md" />
-        </div>
+      {/* Ordinateur : menu repliable (clic sur le logo) */}
+      <Sidebar {...proprietesMenu} />
 
-        <div className="p-3 flex-1 overflow-y-auto">
-          <p className="text-xs text-white/60 uppercase tracking-widest px-2 mb-3 font-semibold">
-            Navigation
-          </p>
-          {navItems.map(item => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.exact}
-              className={({ isActive }) =>
-                `sidebar-item ${isActive ? 'active' : ''}`
-              }
-            >
-              <item.icon className="w-4 h-4 flex-shrink-0" />
-              <span className="flex-1">{item.label}</span>
-              <Pastille n={compteurs[item.badge]} />
-            </NavLink>
-          ))}
+      {/* Mobile / APK : menu par-dessus la page */}
+      <TiroirMobile ouvert={menu.mobileOuvert} fermer={menu.fermerMobile}>
+        <Sidebar {...proprietesMenu} mobile />
+      </TiroirMobile>
 
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <NavLink to="/citoyen/sos"
-              className="sidebar-item bg-red-600/20 hover:bg-red-600/30 text-red-200 border border-red-500/30">
-              <FiAlertTriangle className="w-4 h-4" />
-              Alerte SOS
-            </NavLink>
-          </div>
-        </div>
-
-        <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">
-              {user?.nom?.[0] || 'C'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{user?.nom}</p>
-              <p className="text-xs text-white/60 truncate">{user?.email}</p>
-            </div>
-          </div>
-          <button onClick={handleLogout}
-            className="sidebar-item w-full text-white/60 hover:text-white">
-            <FiLogOut className="w-4 h-4" />
-            Deconnexion
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Mobile overlay sidebar ── */}
-      {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-justice-600 text-white flex flex-col z-50 animate-slide-in">
-            <div className="flex items-center justify-between p-5 border-b border-white/10">
-              <Logo fond="sombre" size="sm" />
-              <button onClick={() => setMobileOpen(false)}>
-                <FiX className="w-6 h-6 text-white/70" />
-              </button>
-            </div>
-
-            <div className="flex-1 p-3 overflow-y-auto">
-              {navItems.map(item => (
-                <NavLink key={item.to} to={item.to} end={item.exact}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}>
-                  <item.icon className="w-4 h-4" />
-                  <span className="flex-1">{item.label}</span>
-                  <Pastille n={compteurs[item.badge]} />
-                </NavLink>
-              ))}
-
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <NavLink to="/citoyen/sos"
-                  onClick={() => setMobileOpen(false)}
-                  className="sidebar-item bg-red-600/20 hover:bg-red-600/30 text-red-200 border border-red-500/30">
-                  <FiAlertTriangle className="w-4 h-4" />
-                  Alerte SOS
-                </NavLink>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-white/10">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">
-                  {user?.nom?.[0] || 'C'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">{user?.nom}</p>
-                  <p className="text-xs text-white/60 truncate">{user?.email}</p>
-                </div>
-              </div>
-              <button onClick={handleLogout}
-                className="sidebar-item w-full text-white/60 hover:text-white">
-                <FiLogOut className="w-4 h-4" />
-                Deconnexion
-              </button>
-            </div>
-          </aside>
-        </div>
-      )}
-
-      {/* ── Main content ── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* ── Main content : s'élargit automatiquement quand le menu se replie ── */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
         {/* Mobile topbar */}
         <header className="lg:hidden bg-justice-600 text-white px-4 py-3 flex items-center justify-between">
-          <button onClick={() => setMobileOpen(true)}>
+          <button onClick={menu.ouvrirMobile} aria-label="Ouvrir le menu" aria-expanded={menu.mobileOuvert}>
             <FiMenu className="w-6 h-6" />
           </button>
           <Logo fond="sombre" size="sm" />

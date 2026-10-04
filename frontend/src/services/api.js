@@ -35,16 +35,24 @@ api.interceptors.response.use(
   }
 )
 
+// Noms des champs affichés dans les messages d'erreur
+const LIBELLES_CHAMPS = {
+  email: 'Email', password: 'Mot de passe', password2: 'Confirmation du mot de passe',
+  nom: 'Nom', prenom: 'Prénom', telephone: 'Téléphone', cni: 'N° CNI', role: 'Rôle', tribunal: 'Tribunal',
+}
+
 /** Extrait le message d'erreur le plus lisible d'une réponse Django */
 export function messageErreur(err, defaut = 'Une erreur est survenue.') {
   const data = err?.response?.data
-  if (!err?.response) return 'Serveur injoignable. Verifiez votre connexion.'
+  if (!err?.response) return 'Serveur injoignable. Vérifiez votre connexion.'
   if (!data || typeof data !== 'object') return defaut
-  if (data.detail) return data.detail
+  if (data.detail) return String(data.detail)
   const champ = Object.keys(data)[0]
   if (!champ) return defaut
-  const val = Array.isArray(data[champ]) ? data[champ][0] : data[champ]
-  return champ === 'non_field_errors' ? String(val) : `${champ} : ${val}`
+  // Tous les messages du champ (ex. mot de passe trop court ET trop courant)
+  const val = [].concat(data[champ]).map(String).join(' ')
+  if (champ === 'non_field_errors') return val
+  return `${LIBELLES_CHAMPS[champ] || champ} : ${val}`
 }
 
 /** Les listes DRF peuvent être paginées ({results}) ou non ([]) */
