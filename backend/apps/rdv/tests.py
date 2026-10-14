@@ -10,7 +10,8 @@ from apps.notifications.models import SMSLog, Notification
 from apps.notifications.sms import normaliser_telephone
 from apps.rdv.models import Tribunal, RendezVous, BureauService
 
-TWILIO_OK = dict(TWILIO_ACCOUNT_SID='ACtest', TWILIO_AUTH_TOKEN='tok', TWILIO_FROM_NUMBER='+15005550006')
+TWILIO_OK = dict(TWILIO_ACCOUNT_SID='ACtest', TWILIO_AUTH_TOKEN='tok', TWILIO_FROM_NUMBER='+15005550006',
+                 BREVO_SMS_SENDER='', SMSGATE_LOGIN='')
 
 
 class FauxClientTwilio:
@@ -122,7 +123,8 @@ class RendezVousTests(APITestCase):
         self.assertEqual((r.status_code, r.data['status'], r.data['sms']), (200, 'confirmed', 'echec'))
         self.assertIn('non verifie', SMSLog.objects.get().erreur)
 
-    @override_settings(TWILIO_ACCOUNT_SID='', TWILIO_AUTH_TOKEN='', TWILIO_FROM_NUMBER='')
+    @override_settings(TWILIO_ACCOUNT_SID='', TWILIO_AUTH_TOKEN='', TWILIO_FROM_NUMBER='', BREVO_SMS_SENDER='',
+                       SMSGATE_LOGIN='')
     def test_sans_configuration_twilio(self):
         rid = self._demande().data['id']
         self.client.force_authenticate(self.accueil)
@@ -130,6 +132,46 @@ class RendezVousTests(APITestCase):
         self.assertEqual(self.client.get('/api/notifications/sms/').status_code, 200)
         self.client.force_authenticate(self.citoyen)
         self.assertEqual(self.client.get('/api/notifications/sms/').status_code, 403)
+
+    @override_settings(SMSGATE_LOGIN='KIGI01', SMSGATE_PASSWORD='mdp-passerelle',
+                       SMSGATE_URL='https://api.sms-gate.app/3rdparty/v1/message',
+                       BREVO_API_KEY='cle-test', BREVO_SMS_SENDER='SunuTrib', TWILIO_ACCOUNT_SID='ACtest')
+    def test_sms_par_telephone_android_prioritaire(self):
+        """Passerelle gratuite par téléphone Android : utilisée avant Brevo et Twilio."""
+        rid = self._demande().data['id']
+        self.client.force_authenticate(self.accueil)
+        reponse = mock.Mock(status_code=202, json=lambda: {'id': 'Pk3Ek', 'state': 'Pending'})
+        with mock.patch('apps.notifications.sms.requests.post', return_value=reponse) as post:
+            r = self.client.post(f'/api/rdv/{rid}/valider/')
+        self.assertEqual(r.data['sms'], 'envoye')
+        self.assertEqual(post.call_args.args[0], 'https://api.sms-gate.app/3rdparty/v1/message')
+        self.assertEqual(post.call_args.kwargs['auth'], ('KIGI01', 'mdp-passerelle'))
+        corps = post.call_args.kwargs['json']
+        self.assertEqual(corps['phoneNumbers'], ['+221771234567'])
+        self.assertIn('CONFIRME', corps['message'])
+        self.assertEqual(SMSLog.objects.get().sid, 'Pk3Ek')
+
+        # Identifiants refusés : message clair, RDV tout de même confirmé
+        rid2 = self._demande(heure='10:00').data['id']
+        self.client.force_authenticate(self.accueil)
+        with mock.patch('apps.notifications.sms.requests.post', return_value=mock.Mock(status_code=401, text='')), \
+             self.assertLogs('apps.notifications.sms', level='ERROR'):
+            r = self.client.post(f'/api/rdv/{rid2}/valider/')
+        self.assertEqual((r.data['status'], r.data['sms']), ('confirmed', 'echec'))
+        self.assertIn('SMSGATE_LOGIN', r.data['sms_erreur'])
+
+    @override_settings(BREVO_API_KEY='cle-test', BREVO_SMS_SENDER='SunuTrib', TWILIO_ACCOUNT_SID='',
+                       SMSGATE_LOGIN='')
+    def test_sms_par_brevo(self):
+        rid = self._demande().data['id']
+        self.client.force_authenticate(self.accueil)
+        reponse = mock.Mock(status_code=201, json=lambda: {'messageId': 1511882900176220})
+        with mock.patch('apps.notifications.sms.requests.post', return_value=reponse) as post:
+            r = self.client.post(f'/api/rdv/{rid}/valider/')
+        self.assertEqual(r.data['sms'], 'envoye')
+        corps = post.call_args.kwargs['json']
+        self.assertEqual((corps['sender'], corps['recipient'][:3]), ('SunuTrib', '221'))
+        self.assertEqual(SMSLog.objects.get().sid, '1511882900176220')
 
     def test_citoyen_ne_valide_pas_et_peut_annuler(self):
         rid = self._demande().data['id']

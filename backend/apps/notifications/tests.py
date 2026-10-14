@@ -45,3 +45,27 @@ class StatsTests(APITestCase):
         self.assertEqual(self.client.get('/api/stats/dashboard/').status_code, 403)
         c = self.client.get('/api/stats/citoyen/').data
         self.assertEqual((c['kpis']['plaintes_en_cours'], len(c['recents'])), (3, 3))
+
+
+class MessagesErreurSMSTests(APITestCase):
+    """Les erreurs des fournisseurs SMS s'affichent en français, sans code technique."""
+
+    def test_erreurs_twilio_lisibles(self):
+        from twilio.base.exceptions import TwilioRestException
+        from apps.notifications.sms import message_lisible
+        # Message réel du compte d'essai, avec les codes couleur ANSI de la bibliothèque Twilio
+        brut = ('\x1b[31m\x1b[49mHTTP Error\x1b[0m \x1b[37m\x1b[49mYour request was:\x1b[0m '
+                '\x1b[34m\x1b[49mUnable to create record: Invalid template. Trial accounts can only use '
+                'predefined SMS templates.\x1b[0m \x1b[37m\x1b[49mMore information may be available here:\x1b[0m')
+        texte = message_lisible(TwilioRestException(400, '/Accounts/AC123/Messages.json', msg=brut, code=63038))
+        self.assertIn('modèles de SMS prédéfinis', texte)
+        for interdit in ('\x1b', '[31m', 'Accounts', 'http'):
+            self.assertNotIn(interdit, texte)
+        self.assertIn('Verified Caller IDs', message_lisible(TwilioRestException(400, '/x', msg='unverified', code=21608)))
+        self.assertIn('TWILIO_AUTH_TOKEN', message_lisible(TwilioRestException(401, '/x', msg='Authenticate', code=20003)))
+        self.assertEqual(message_lisible(TwilioRestException(400, '/x', msg='?', code=99999)),
+                         'Twilio a refusé le SMS (code 99999).')
+
+    def test_erreur_reseau(self):
+        from apps.notifications.sms import message_lisible
+        self.assertEqual(message_lisible(ConnectionError('boom')), 'Service SMS injoignable (connexion internet).')

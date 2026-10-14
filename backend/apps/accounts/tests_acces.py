@@ -2,7 +2,9 @@
 Sécurisation de l'accès du personnel — SunuTribunal
 Lancer : python manage.py test apps.accounts
 """
+import re
 from datetime import timedelta
+from django.core import mail
 from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -11,6 +13,11 @@ from apps.rdv.models import Tribunal
 
 MSG_ECHEC = 'Email ou mot de passe incorrect.'
 MSG_BLOQUE = 'Trop de tentatives. Réessayez dans 15 minutes.'
+
+
+def mot_de_passe_recu():
+    """Mot de passe provisoire lu dans le dernier e-mail envoyé (boîte mémoire des tests)."""
+    return re.search(r'Mot de passe provisoire : (\S+)', mail.outbox[-1].body).group(1)
 
 
 class AccesPersonnelTests(APITestCase):
@@ -25,17 +32,18 @@ class AccesPersonnelTests(APITestCase):
     def _login(self, email, password):
         return self.client.post('/api/auth/login/', {'email': email, 'password': password}, format='json')
 
-    def _creer_agent(self, email='juge2@test.sn', role='juge', password='Temporaire2026'):
+    def _creer_agent(self, email='juge2@test.sn', role='juge'):
+        """Crée un agent par la page Personnel ; son mot de passe provisoire arrive par e-mail."""
         self.client.force_authenticate(self.chef)
         res = self.client.post('/api/auth/staff/', {'email': email, 'nom': 'Diop', 'prenom': 'Awa',
-                                                    'role': role, 'password': password}, format='json')
+                                                    'role': role}, format='json')
         self.client.force_authenticate(None)
         return res
 
     # ── 1. Formulaire de connexion unique ──────────────
     def test_formulaire_unique_renvoie_le_bon_role(self):
         self.assertEqual(self._creer_agent().status_code, 201)
-        res = self._login('juge2@test.sn', 'Temporaire2026')
+        res = self._login('juge2@test.sn', mot_de_passe_recu())
         self.assertEqual(res.status_code, 200)
         self.assertEqual((res.data['user']['role'], res.data['doit_changer_mdp']), ('juge', True))
         res = self._login('citoyen@test.sn', 'motdepasse123')
@@ -78,36 +86,37 @@ class AccesPersonnelTests(APITestCase):
     # ── 2. Changement obligatoire du mot de passe ──────
     def test_changement_obligatoire_a_la_premiere_connexion(self):
         self._creer_agent()
-        jeton = self._login('juge2@test.sn', 'Temporaire2026').data['access']
+        tmp = mot_de_passe_recu()
+        jeton = self._login('juge2@test.sn', tmp).data['access']
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {jeton}')
 
         # Tout est bloqué côté serveur, sauf le profil et le changement de mot de passe
         res = self.client.get('/api/rdv/')
-        self.assertEqual((res.status_code, res.data['code']), (403, 'mot_de_passe_a_changer'))
+        self.assertEqual((res.status_code, res.data['code']), (403, 'changement_mdp_requis'))
         self.assertTrue(self.client.get('/api/auth/me/').data['doit_changer_mdp'])
 
         url = '/api/auth/changer-mot-de-passe/'
         cas_refuses = [
-            ({'ancien': 'faux', 'nouveau': 'Baobab-Dakar-2026', 'confirmation': 'Baobab-Dakar-2026'}, 'ancien'),
-            ({'ancien': 'Temporaire2026', 'nouveau': 'Baobab-Dakar-2026', 'confirmation': 'autre'}, 'confirmation'),
-            ({'ancien': 'Temporaire2026', 'nouveau': 'Temporaire2026', 'confirmation': 'Temporaire2026'}, 'nouveau'),
-            ({'ancien': 'Temporaire2026', 'nouveau': 'Ab1-x', 'confirmation': 'Ab1-x'}, 'nouveau'),            # trop court
-            ({'ancien': 'Temporaire2026', 'nouveau': 'password', 'confirmation': 'password'}, 'nouveau'),      # trop courant
-            ({'ancien': 'Temporaire2026', 'nouveau': 'juge2@test.sn', 'confirmation': 'juge2@test.sn'}, 'nouveau'),  # proche de l'email
+            ({'ancien_mdp': 'faux', 'nouveau_mdp': 'Baobab-Dakar-2026', 'confirmation': 'Baobab-Dakar-2026'}, 'ancien_mdp'),
+            ({'ancien_mdp': tmp, 'nouveau_mdp': 'Baobab-Dakar-2026', 'confirmation': 'autre'}, 'confirmation'),
+            ({'ancien_mdp': tmp, 'nouveau_mdp': tmp, 'confirmation': tmp}, 'nouveau_mdp'),
+            ({'ancien_mdp': tmp, 'nouveau_mdp': 'Ab1-x', 'confirmation': 'Ab1-x'}, 'nouveau_mdp'),            # trop court
+            ({'ancien_mdp': tmp, 'nouveau_mdp': 'password', 'confirmation': 'password'}, 'nouveau_mdp'),      # trop courant
+            ({'ancien_mdp': tmp, 'nouveau_mdp': 'juge2@test.sn', 'confirmation': 'juge2@test.sn'}, 'nouveau_mdp'),  # proche de l'email
         ]
         for data, champ in cas_refuses:
             res = self.client.post(url, data, format='json')
             self.assertEqual(res.status_code, 400, data)
             self.assertIn(champ, res.data, data)
 
-        res = self.client.post(url, {'ancien': 'Temporaire2026', 'nouveau': 'Baobab-Dakar-2026',
+        res = self.client.post(url, {'ancien_mdp': tmp, 'nouveau_mdp': 'Baobab-Dakar-2026',
                                      'confirmation': 'Baobab-Dakar-2026'}, format='json')
         self.assertEqual(res.status_code, 200, res.data)
         self.assertFalse(res.data['user']['doit_changer_mdp'])
         self.assertEqual(self.client.get('/api/rdv/').status_code, 200)
 
         self.client.credentials()
-        self.assertEqual(self._login('juge2@test.sn', 'Temporaire2026').status_code, 401)
+        self.assertEqual(self._login('juge2@test.sn', tmp).status_code, 401)
         self.assertFalse(self._login('juge2@test.sn', 'Baobab-Dakar-2026').data['doit_changer_mdp'])
 
     def test_comptes_existants_non_concernes(self):
@@ -136,9 +145,12 @@ class AccesPersonnelTests(APITestCase):
         res = self.client.patch(f'/api/auth/staff/{chef2.id}/', {'is_active': False}, format='json')
         self.assertEqual(res.status_code, 403)
 
-        # Nouveau mot de passe temporaire donné par le chef → à changer de nouveau
-        res = self.client.patch(f'/api/auth/staff/{juge.id}/', {'password': 'NouveauTemp26'}, format='json')
-        self.assertEqual(res.status_code, 200)
+        # Le chef ne peut plus fixer lui-même un mot de passe : le champ est ignoré
+        avant = User.objects.get(pk=juge.pk).password
+        self.client.patch(f'/api/auth/staff/{juge.id}/', {'password': 'ChoisiParLeChef26'}, format='json')
+        self.assertEqual(User.objects.get(pk=juge.pk).password, avant)
+        # « Renvoyer les identifiants » → nouveau mot de passe provisoire à changer de nouveau
+        self.assertEqual(self.client.post(f'/api/auth/staff/{juge.id}/renvoyer/').status_code, 200)
         self.assertTrue(SecuriteCompte.de(juge).doit_changer_mdp)
 
     # ── 4. Blocage après 5 échecs ──────────────────────
@@ -175,15 +187,31 @@ class AccesPersonnelTests(APITestCase):
         page = self.client.get('/admin/accounts/user/add/').content.decode()
         self.assertIn('name="role"', page)
         self.assertIn('name="tribunal"', page)
+        self.assertNotIn('name="password1"', page)      # plus aucun mot de passe à saisir
 
         res = self.client.post('/admin/accounts/user/add/', {
             'email': 'nouveau.chef@test.sn', 'nom': 'Sarr', 'prenom': 'Khady', 'telephone': '',
             'role': 'admin', 'tribunal': self.tribunal.id,
-            'password1': 'Temporaire-2026', 'password2': 'Temporaire-2026', 'usable_password': 'true',
-            'securite-TOTAL_FORMS': '0', 'securite-INITIAL_FORMS': '0',
-            'securite-MIN_NUM_FORMS': '0', 'securite-MAX_NUM_FORMS': '1',
         })
         self.assertEqual(res.status_code, 302, res.content.decode()[:3000])
         chef = User.objects.get(email='nouveau.chef@test.sn')
         self.assertEqual((chef.role, chef.tribunal), ('admin', self.tribunal))
         self.assertTrue(SecuriteCompte.de(chef).doit_changer_mdp)
+        self.assertEqual(mail.outbox[-1].to, ['nouveau.chef@test.sn'])
+        self.assertEqual(self._login('nouveau.chef@test.sn', mot_de_passe_recu()).data['doit_changer_mdp'], True)
+
+    def test_django_admin_tribunal_obligatoire_et_action_renvoyer(self):
+        su = User.objects.create_superuser('root@test.sn', 'motdepasse123', nom='Root')
+        self.client.force_login(su)
+        res = self.client.post('/admin/accounts/user/add/', {'email': 'sans.tribunal@test.sn', 'nom': 'X',
+                                                             'role': 'admin', 'tribunal': ''})
+        self.assertEqual(res.status_code, 200)            # formulaire réaffiché avec l'erreur
+        self.assertIn('Le tribunal est obligatoire', res.content.decode())
+        self.assertFalse(User.objects.filter(email='sans.tribunal@test.sn').exists())
+
+        juge = User.objects.create_user('juge9@test.sn', 'motdepasse123', nom='Diop', role='juge', tribunal=self.tribunal)
+        res = self.client.post('/admin/accounts/user/', {'action': 'renvoyer_identifiants',
+                                                         '_selected_action': [juge.id]}, follow=True)
+        self.assertIn('Identifiants envoyés à juge9@test.sn', res.content.decode())
+        self.assertEqual(mail.outbox[-1].subject, 'SunuTribunal — Réinitialisation de votre mot de passe')
+        self.assertTrue(SecuriteCompte.de(juge).doit_changer_mdp)

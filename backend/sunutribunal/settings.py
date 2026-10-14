@@ -190,14 +190,37 @@ FIREBASE_CREDENTIALS = env('FIREBASE_CREDENTIALS', default='')
 TWILIO_ACCOUNT_SID = env('TWILIO_ACCOUNT_SID', default='')
 TWILIO_AUTH_TOKEN  = env('TWILIO_AUTH_TOKEN',  default='')
 TWILIO_FROM_NUMBER = env('TWILIO_FROM_NUMBER', default='')
+# SMS par Brevo (prioritaire sur Twilio) : BREVO_API_KEY (plus bas) + nom d'expéditeur, 11 caractères max
+BREVO_SMS_SENDER   = env('BREVO_SMS_SENDER', default='')
+# SMS gratuits par votre téléphone Android (application « SMS Gateway for Android », sms-gate.app) :
+# prioritaire sur Brevo et Twilio. Identifiants affichés dans l'application (mode « Cloud server »).
+SMSGATE_URL      = env('SMSGATE_URL', default='https://api.sms-gate.app/3rdparty/v1/message')
+SMSGATE_LOGIN    = env('SMSGATE_LOGIN', default='')
+SMSGATE_PASSWORD = env('SMSGATE_PASSWORD', default='')
 
-# ── Email ──────────────────────────────────
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-EMAIL_HOST    = env('EMAIL_HOST',    default='smtp.gmail.com')
-EMAIL_PORT    = env.int('EMAIL_PORT', default=587)
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER     = env('EMAIL_HOST_USER',     default='')
+# ── Email (identifiants provisoires du personnel) ──
+# Gmail : EMAIL_HOST_PASSWORD = « mot de passe d'application » (compte Google → Sécurité),
+# pas le mot de passe habituel. Sans EMAIL_HOST_USER, l'e-mail s'affiche dans le terminal.
+EMAIL_HOST          = env('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT          = env.int('EMAIL_PORT', default=587)
+EMAIL_USE_TLS       = env.bool('EMAIL_USE_TLS', default=True)    # port 587 (STARTTLS)
+EMAIL_USE_SSL       = env.bool('EMAIL_USE_SSL', default=False)   # port 465 (SSL direct) — jamais les deux à True
+EMAIL_HOST_USER     = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+EMAIL_TIMEOUT       = 20
+# Brevo (API web, port 443) : prioritaire quand la clé est renseignée — passe là où le SMTP est bloqué
+BREVO_API_KEY       = env('BREVO_API_KEY', default='')
+if BREVO_API_KEY:
+    EMAIL_BACKEND = 'apps.accounts.brevo.BrevoEmailBackend'
+elif EMAIL_HOST_USER:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL  = env('DEFAULT_FROM_EMAIL',
+                          default=f'SunuTribunal <{EMAIL_HOST_USER or "noreply@sunutribunal.sn"}>')
+# Adresse de la plateforme mise dans les e-mails (bouton « Accéder à SunuTribunal »)
+FRONTEND_URL = env('FRONTEND_URL', default='')
+
 GROQ_API_KEY = env('GROQ_API_KEY', default='')
 
 # ── Numérotation des registres ─────────────
@@ -207,5 +230,4 @@ CODE_JURIDICTION = env('CODE_JURIDICTION', default='SNTRIB')
 # ── Fichiers envoyés (scans) ───────────────
 DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024   # 20 Mo
 FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
-DEFAULT_FROM_EMAIL  = 'noreply@sunutribunal.sn'
 

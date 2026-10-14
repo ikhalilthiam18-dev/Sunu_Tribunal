@@ -106,3 +106,46 @@ class SecuriteCompte(models.Model):
 def doit_changer_mdp(user):
     """True si l'utilisateur doit remplacer son mot de passe temporaire (ligne absente = non)."""
     return SecuriteCompte.objects.filter(user=user, doit_changer_mdp=True).exists()
+
+
+class IdentifiantsProvisoires(models.Model):
+    """
+    Suivi des identifiants provisoires envoyés par e-mail (nouvelle table).
+    Séparée de SecuriteCompte car la table accounts_securitecompte existe déjà :
+    sans dossier migrations, on ne peut pas lui ajouter de colonnes.
+    """
+    user = models.OneToOneField('accounts.User', on_delete=models.CASCADE, related_name='identifiants')
+    cree_par = models.ForeignKey('accounts.User', null=True, blank=True, on_delete=models.SET_NULL,
+                                 related_name='identifiants_crees', verbose_name='Créé par')
+    mdp_provisoire_envoye_le = models.DateTimeField(null=True, blank=True,
+                                                    verbose_name='Mot de passe provisoire envoyé le')
+    mdp_change_le = models.DateTimeField(null=True, blank=True, verbose_name='Mot de passe changé le')
+
+    class Meta:
+        verbose_name = 'Identifiants provisoires'
+        verbose_name_plural = 'Identifiants provisoires'
+
+    def __str__(self):
+        return f'Identifiants · {self.user.email}'
+
+
+# Caractères du mot de passe provisoire : sans 0/O, 1/l/I, pour une lecture sans ambiguïté
+_MAJUSCULES = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+_MINUSCULES = 'abcdefghijkmnpqrstuvwxyz'
+_CHIFFRES   = '23456789'
+_SYMBOLES   = '!@#$%*-?'
+
+
+def generer_mot_de_passe(longueur=12):
+    """
+    Mot de passe provisoire aléatoire (module secrets : générateur cryptographique, jamais random).
+    Contient toujours au moins une majuscule, une minuscule, un chiffre et un symbole.
+    """
+    import secrets
+    tirage = secrets.SystemRandom()
+    caracteres = [secrets.choice(_MAJUSCULES), secrets.choice(_MINUSCULES),
+                  secrets.choice(_CHIFFRES), secrets.choice(_SYMBOLES)]
+    tous = _MAJUSCULES + _MINUSCULES + _CHIFFRES + _SYMBOLES
+    caracteres += [secrets.choice(tous) for _ in range(longueur - len(caracteres))]
+    tirage.shuffle(caracteres)
+    return ''.join(caracteres)

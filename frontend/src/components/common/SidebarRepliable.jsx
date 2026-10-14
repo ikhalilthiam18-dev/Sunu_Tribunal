@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { FiChevronsLeft, FiChevronsRight, FiLogOut, FiX } from 'react-icons/fi'
+import { FiChevronsLeft, FiChevronsRight, FiLogOut, FiX, FiKey } from 'react-icons/fi'
 import Logo from './Logo.jsx'
+import { PAGE_MOT_DE_PASSE } from '../../context/AuthContext.jsx'
 
 /**
  * Menu latéral repliable, partagé par l'espace citoyen et l'espace tribunal.
@@ -185,6 +186,13 @@ export function Sidebar({
             {utilisateur.icone}
           </div>
         )}
+        {/* Profil : changement de mot de passe, pour tous les utilisateurs */}
+        <NavLink to={PAGE_MOT_DE_PASSE} onClick={apresNavigation}
+          aria-label={compact ? 'Changer le mot de passe' : undefined} {...bulle.props('Changer le mot de passe')}
+          className={`sidebar-item text-white/60 hover:text-white ${compact ? 'justify-center !px-0 w-11' : 'w-full'}`}>
+          <FiKey className={compact ? 'w-5 h-5' : 'w-4 h-4'} />
+          {!compact && 'Changer le mot de passe'}
+        </NavLink>
         <button type="button" onClick={onDeconnexion}
           aria-label={compact ? 'Déconnexion' : undefined} {...bulle.props('Déconnexion')}
           className={`sidebar-item text-white/60 hover:text-white ${compact ? 'justify-center !px-0 w-11' : 'w-full'}`}>

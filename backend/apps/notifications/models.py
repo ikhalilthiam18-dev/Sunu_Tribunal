@@ -34,7 +34,7 @@ class SMSLog(models.Model):
     STATUTS = [
         ('envoye',        'Envoyé'),
         ('echec',         'Échec'),
-        ('non_configure', 'Twilio non configuré'),
+        ('non_configure', 'SMS non configuré'),
         ('numero_invalide', 'Numéro invalide'),
     ]
     destinataire = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
@@ -42,7 +42,7 @@ class SMSLog(models.Model):
     telephone    = models.CharField(max_length=30, blank=True)
     message      = models.TextField()
     statut       = models.CharField(max_length=20, choices=STATUTS)
-    sid          = models.CharField(max_length=64, blank=True, help_text='Identifiant Twilio')
+    sid          = models.CharField(max_length=64, blank=True, help_text='Identifiant du message (Brevo ou Twilio)')
     erreur       = models.TextField(blank=True)
     objet_ref    = models.CharField(max_length=60, blank=True, help_text='Ex : RDV-2026-12345')
     created_at   = models.DateTimeField(auto_now_add=True)

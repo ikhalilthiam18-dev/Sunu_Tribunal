@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { FiUser, FiShield, FiPlus, FiTrash2, FiEye, FiEyeOff, FiAlertCircle, FiCheck, FiMail, FiPhone } from 'react-icons/fi'
-import { staffAPI } from '../../services/api.js'
+import { FiShield, FiPlus, FiTrash2, FiAlertCircle, FiCheck, FiMail, FiPhone, FiSend, FiKey } from 'react-icons/fi'
+import { staffAPI, messageErreur } from '../../services/api.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import toast from 'react-hot-toast'
 
@@ -22,19 +22,11 @@ const versAffichage = (u) => ({
   email:  u.email,
   role:   u.role,
   actif:  u.is_active,
+  doitChanger: !!u.doit_changer_mdp,
   date:   new Date(u.date_joined).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' }),
 })
 
-// Premier message d'erreur lisible renvoye par Django
-const messageErreur = (err, defaut) => {
-  const data = err.response?.data
-  if (!data) return 'Serveur injoignable. Verifiez que le backend est lance.'
-  if (data.detail) return data.detail
-  const champ = Object.keys(data)[0]
-  const val = data[champ]
-  if (champ) return (champ === 'non_field_errors' ? '' : champ + ' : ') + (Array.isArray(val) ? val[0] : val)
-  return defaut
-}
+const FORM_VIDE = { nom:'', prenom:'', email:'', telephone:'', role:'greffier' }
 
 export default function AdminUtilisateurs() {
   const { user } = useAuth()
@@ -43,14 +35,11 @@ export default function AdminUtilisateurs() {
   const [utilisateurs, setUtilisateurs] = useState([])
   const [chargement, setChargement]     = useState(true)
   const [showForm, setShowForm]         = useState(false)
-  const [showPass, setShowPass]         = useState(false)
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState('')
-  const [success, setSuccess]           = useState(false)
-  const [form, setForm] = useState({
-    nom: '', prenom: '', email: '', telephone: '',
-    password: '', role: 'greffier',
-  })
+  const [success, setSuccess]           = useState(null)   // { message, emailEnvoye }
+  const [renvoiEnCours, setRenvoiEnCours] = useState(null)
+  const [form, setForm] = useState(FORM_VIDE)
 
   // Chargement du personnel depuis le backend
   useEffect(() => {
@@ -65,38 +54,53 @@ export default function AdminUtilisateurs() {
 
   const handleCreate = async (e) => {
     e.preventDefault()
-    if (!form.nom || !form.email || !form.password) {
+    if (!form.nom || !form.email) {
       setError('Veuillez remplir tous les champs obligatoires.')
-      return
-    }
-    if (form.password.length < 8) {
-      setError('Le mot de passe temporaire doit contenir au moins 8 caracteres.')
       return
     }
     setLoading(true)
     setError('')
     try {
+      // Aucun mot de passe : le serveur en génère un et l'envoie par e-mail à l'agent
       const res = await staffAPI.create({
         email:     form.email,
-        password:  form.password,
         nom:       form.nom,
         prenom:    form.prenom,
         telephone: form.telephone,
         role:      form.role,
       })
-      const roleLabel = ROLES.find(r => r.value === form.role)?.label || form.role
       setUtilisateurs(u => [versAffichage(res.data), ...u])
-      setSuccess(true)
-      toast.success(`Compte ${roleLabel} cree pour ${form.nom} !`)
-      setTimeout(() => {
-        setSuccess(false)
-        setShowForm(false)
-        setForm({ nom:'', prenom:'', email:'', telephone:'', password:'', role:'greffier' })
-      }, 2000)
+      setSuccess({ message: res.data.message, emailEnvoye: res.data.email_envoye })
+      if (res.data.email_envoye) toast.success(res.data.message)
+      else toast.error(res.data.message, { duration: 8000 })
+      setForm(FORM_VIDE)
     } catch (err) {
-      setError(messageErreur(err, 'Erreur lors de la creation. Cet email existe peut-etre deja.'))
+      setError(messageErreur(err, 'Erreur lors de la creation du compte.'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const renvoyer = async (u) => {
+    const ok = window.confirm(
+      `Renvoyer les identifiants à ${u.prenom} ${u.nom} ?\n\n` +
+      `Un NOUVEAU mot de passe provisoire sera envoyé à ${u.email}. ` +
+      `L'ancien ne fonctionnera plus et l'agent devra le changer à sa prochaine connexion.`)
+    if (!ok) return
+    setRenvoiEnCours(u.id)
+    try {
+      const res = await staffAPI.renvoyer(u.id)
+      // Si l'e-mail n'est pas parti, l'ancien mot de passe reste valable : rien ne change pour l'agent
+      if (res.data.email_envoye) {
+        setUtilisateurs(liste => liste.map(x => x.id === u.id ? { ...x, doitChanger: true } : x))
+        toast.success(res.data.message)
+      } else {
+        toast.error(res.data.message, { duration: 8000 })
+      }
+    } catch (err) {
+      toast.error(messageErreur(err, "Impossible de renvoyer les identifiants."))
+    } finally {
+      setRenvoiEnCours(null)
     }
   }
 
@@ -151,7 +155,7 @@ export default function AdminUtilisateurs() {
           <h1 className="font-display text-2xl font-bold text-navy-700">Personnel judiciaire</h1>
           <p className="text-gray-500 text-sm mt-1">Gestion des comptes du tribunal</p>
         </div>
-        <button onClick={() => { setShowForm(!showForm); setError(''); setSuccess(false) }}
+        <button onClick={() => { setShowForm(!showForm); setError(''); setSuccess(null) }}
           className="btn-primary flex items-center gap-2 whitespace-nowrap flex-shrink-0 px-4">
           <FiPlus className="w-4 h-4" />
           Creer un compte
@@ -181,14 +185,25 @@ export default function AdminUtilisateurs() {
           </h3>
 
           {success ? (
-            <div className="flex flex-col items-center py-8">
-              <div className="w-16 h-16 rounded-full bg-justice-50 flex items-center justify-center mb-4">
-                <FiCheck className="w-8 h-8 text-justice-500" />
+            <div className="flex flex-col items-center py-8 text-center">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                success.emailEnvoye ? 'bg-justice-50' : 'bg-amber-50'}`}>
+                {success.emailEnvoye
+                  ? <FiCheck className="w-8 h-8 text-justice-500" />
+                  : <FiAlertCircle className="w-8 h-8 text-amber-600" />}
               </div>
-              <p className="font-bold text-navy-700 text-lg">Compte cree avec succes !</p>
-              <p className="text-gray-500 text-sm mt-1">
-                Les identifiants ont ete configures.
+              <p className="font-bold text-navy-700 text-lg">
+                {success.emailEnvoye ? 'Compte créé' : 'Compte créé, e-mail non envoyé'}
               </p>
+              <p className="text-gray-600 text-sm mt-1 max-w-md">{success.message}</p>
+              <div className="flex gap-3 mt-6">
+                <button type="button" className="btn-ghost" onClick={() => { setShowForm(false); setSuccess(null) }}>
+                  Fermer
+                </button>
+                <button type="button" className="btn-primary" onClick={() => setSuccess(null)}>
+                  <FiPlus className="w-4 h-4 mr-2" /> Créer un autre compte
+                </button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleCreate} className="space-y-4">
@@ -252,28 +267,14 @@ export default function AdminUtilisateurs() {
                 </div>
               </div>
 
-              {/* Mot de passe */}
-              <div>
-                <label className="form-label">Mot de passe temporaire *</label>
-                <div className="relative">
-                  <FiShield className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input className="form-input pl-10 pr-10"
-                    type={showPass ? 'text' : 'password'} required minLength={8}
-                    placeholder="Min. 8 caracteres"
-                    value={form.password} onChange={e => set('password', e.target.value)} />
-                  <button type="button" onClick={() => setShowPass(!showPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    {showPass ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400 mt-1">
-                  Mot de passe temporaire : l'agent devra le remplacer par le sien a sa premiere connexion.
-                </p>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
-                <strong>Important :</strong> Communiquez les identifiants de connexion
-                directement et en prive a la personne concernee.
+              {/* Plus de mot de passe à saisir : il est généré et envoyé par e-mail */}
+              <div className="flex items-start gap-3 bg-navy-50 border border-navy-100 rounded-xl p-3 text-xs text-navy-600 leading-relaxed">
+                <FiKey className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  Un <strong>mot de passe provisoire</strong> sera généré automatiquement et envoyé à l'adresse
+                  e-mail ci-dessus. L'agent devra le remplacer par le sien dès sa première connexion.
+                  Le compte sera rattaché à votre juridiction.
+                </span>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -332,6 +333,11 @@ export default function AdminUtilisateurs() {
                       Desactive
                     </span>
                   )}
+                  {u.actif && u.doitChanger && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                      Mot de passe à définir
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">{u.email}</p>
                 <p className="text-xs text-gray-400">Compte cree le {u.date}</p>
@@ -339,6 +345,15 @@ export default function AdminUtilisateurs() {
 
               {u.role !== 'admin' && (
               <div className="flex items-center gap-2 flex-shrink-0">
+                {u.actif && (
+                  <button onClick={() => renvoyer(u)} disabled={renvoiEnCours === u.id}
+                    title="Renvoyer les identifiants" aria-label={`Renvoyer les identifiants à ${u.prenom} ${u.nom}`}
+                    className="p-2 rounded-xl text-navy-600 hover:bg-navy-50 transition-colors disabled:opacity-50">
+                    {renvoiEnCours === u.id
+                      ? <span className="block w-4 h-4 border-2 border-navy-100 border-t-navy-700 rounded-full animate-spin" />
+                      : <FiSend className="w-4 h-4" />}
+                  </button>
+                )}
                 <button onClick={() => desactiver(u.id)}
                   title={u.actif ? 'Desactiver' : 'Reactiver'}
                   className={`p-2 rounded-xl transition-colors ${

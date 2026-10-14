@@ -54,12 +54,11 @@ function AppRoutes() {
       {/* Page d'accueil : redirection unique selon le rôle */}
       <Route path="/" element={home ? <Navigate to={home} replace /> : <LandingPage />} />
 
-      {/* Définir son mot de passe (1re connexion d'un compte du personnel) */}
+      {/* Changer son mot de passe : obligatoire si provisoire (1re connexion), sinon depuis le menu */}
       <Route path={PAGE_MOT_DE_PASSE} element={
-        !isAuth ? <Navigate to="/" replace />
-          : user.doit_changer_mdp ? <MotDePassePage />
-          : <Navigate to={homePathFor(user.role) || '/'} replace />
+        isAuth ? <MotDePassePage obligatoire={!!user.doit_changer_mdp} /> : <Navigate to="/" replace />
       } />
+      <Route path="/mot-de-passe" element={<Navigate to={PAGE_MOT_DE_PASSE} replace />} />
 
       {/* Ancien login redirige vers accueil */}
       <Route path="/login" element={<Navigate to="/" replace />} />

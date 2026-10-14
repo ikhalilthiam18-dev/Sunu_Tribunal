@@ -73,43 +73,46 @@ class RegisterSerializer(serializers.ModelSerializer):
 class StaffUserSerializer(serializers.ModelSerializer):
     """
     Création / gestion des comptes du personnel judiciaire (greffier en chef uniquement).
-    Le mot de passe saisi est temporaire : l'agent devra le changer à sa 1re connexion.
+    Aucun mot de passe n'est saisi : le serveur génère un mot de passe provisoire et l'envoie
+    par e-mail (voir apps/accounts/emails.py). Le tribunal est forcé à celui du créateur.
     """
-    password = serializers.CharField(write_only=True, min_length=8, required=False)
-    role     = serializers.ChoiceField(choices=[r for r in User.ROLES if r[0] in ROLES_CREABLES_PAR_LE_CHEF])
+    role = serializers.ChoiceField(choices=[r for r in User.ROLES if r[0] in ROLES_CREABLES_PAR_LE_CHEF])
+    tribunal_nom = serializers.CharField(source='tribunal.nom', read_only=True, default='')
+    doit_changer_mdp = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
-        fields = ['id','email','nom','prenom','telephone','role','tribunal',
-                  'is_active','date_joined','password']
+        fields = ['id','email','nom','prenom','telephone','role','tribunal','tribunal_nom',
+                  'is_active','date_joined','doit_changer_mdp']
         read_only_fields = ['id','date_joined']
 
-    def validate(self, data):
-        if self.instance is None and not data.get('password'):
-            raise serializers.ValidationError({'password': 'Mot de passe temporaire requis.'})
-        return data
+    def get_doit_changer_mdp(self, obj):
+        return doit_changer_mdp(obj)
+
+    def validate_email(self, email):
+        email = User.objects.normalize_email(email)
+        doublon = User.objects.filter(email__iexact=email)
+        if self.instance:
+            doublon = doublon.exclude(pk=self.instance.pk)
+        if doublon.exists():
+            raise serializers.ValidationError('Un compte existe déjà avec cette adresse email.')
+        return email
+
+    def _tribunal_impose(self, validated_data):
+        """Le compte est rattaché au tribunal du greffier en chef (seul un superutilisateur choisit)."""
+        createur = self.context['request'].user
+        if createur.tribunal_id and not createur.is_superuser:
+            validated_data['tribunal'] = createur.tribunal
+        return validated_data
 
     def create(self, validated_data):
-        password = validated_data.pop('password')
-        # Rattache par défaut le nouveau compte au tribunal du créateur
-        request = self.context.get('request')
-        if not validated_data.get('tribunal') and request and request.user.tribunal_id:
-            validated_data['tribunal'] = request.user.tribunal
-        user = User.objects.create_user(password=password, is_verified=True, **validated_data)
-        SecuriteCompte.exiger_changement(user)
-        return user
+        validated_data = self._tribunal_impose(validated_data)
+        # Mot de passe inutilisable en attendant le mot de passe provisoire (attribué juste après par la vue)
+        return User.objects.create_user(password=None, is_verified=True, **validated_data)
 
     def update(self, instance, validated_data):
-        password = validated_data.pop('password', None)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        if password:
-            instance.set_password(password)
-        instance.save()
-        if password:
-            # Nouveau mot de passe temporaire donné par le chef : à changer à la prochaine connexion
-            SecuriteCompte.exiger_changement(instance)
-        return instance
+        validated_data = self._tribunal_impose(validated_data)
+        return super().update(instance, validated_data)
 
 
 class CustomTokenSerializer(TokenObtainPairSerializer):
@@ -171,21 +174,21 @@ class CustomTokenSerializer(TokenObtainPairSerializer):
 
 
 class ChangerMotDePasseSerializer(serializers.Serializer):
-    ancien       = serializers.CharField(write_only=True)
-    nouveau      = serializers.CharField(write_only=True)
+    ancien_mdp   = serializers.CharField(write_only=True)
+    nouveau_mdp  = serializers.CharField(write_only=True)
     confirmation = serializers.CharField(write_only=True)
 
     def validate(self, data):
         user = self.context['request'].user
-        if not user.check_password(data['ancien']):
-            raise serializers.ValidationError({'ancien': 'Mot de passe actuel incorrect.'})
-        if data['nouveau'] != data['confirmation']:
+        if not user.check_password(data['ancien_mdp']):
+            raise serializers.ValidationError({'ancien_mdp': 'Mot de passe actuel incorrect.'})
+        if data['nouveau_mdp'] != data['confirmation']:
             raise serializers.ValidationError({'confirmation': 'Les deux mots de passe ne correspondent pas.'})
-        if data['nouveau'] == data['ancien']:
-            raise serializers.ValidationError({'nouveau': 'Choisissez un mot de passe différent du mot de passe temporaire.'})
+        if data['nouveau_mdp'] == data['ancien_mdp']:
+            raise serializers.ValidationError({'nouveau_mdp': "Le nouveau mot de passe doit être différent de l'ancien."})
         try:
             # 8 caractères minimum, pas un mot de passe courant, pas trop proche de l'email ou du nom
-            validate_password(data['nouveau'], user)
+            validate_password(data['nouveau_mdp'], user)
         except DjangoValidationError as e:
-            raise serializers.ValidationError({'nouveau': list(e.messages)})
+            raise serializers.ValidationError({'nouveau_mdp': list(e.messages)})
         return data

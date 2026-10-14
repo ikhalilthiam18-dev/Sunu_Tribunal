@@ -27,8 +27,8 @@ api.interceptors.response.use(
       // (pas de rechargement de page → plus de page blanche)
       window.dispatchEvent(new CustomEvent('st:session-expiree'))
     }
-    if (err.response?.status === 403 && err.response.data?.code === 'mot_de_passe_a_changer') {
-      // Mot de passe temporaire : le serveur refuse tout tant qu'il n'est pas changé
+    if (err.response?.status === 403 && err.response.data?.code === 'changement_mdp_requis') {
+      // Mot de passe provisoire : le serveur refuse tout tant qu'il n'est pas changé
       window.dispatchEvent(new CustomEvent('st:mot-de-passe-a-changer'))
     }
     return Promise.reject(err)
@@ -39,6 +39,7 @@ api.interceptors.response.use(
 const LIBELLES_CHAMPS = {
   email: 'Email', password: 'Mot de passe', password2: 'Confirmation du mot de passe',
   nom: 'Nom', prenom: 'Prénom', telephone: 'Téléphone', cni: 'N° CNI', role: 'Rôle', tribunal: 'Tribunal',
+  ancien_mdp: 'Mot de passe actuel', nouveau_mdp: 'Nouveau mot de passe', confirmation: 'Confirmation',
 }
 
 /** Extrait le message d'erreur le plus lisible d'une réponse Django */
@@ -73,6 +74,8 @@ export const staffAPI = {
   list:   ()         => api.get('/auth/staff/'),
   create: (data)     => api.post('/auth/staff/', data),
   update: (id, data) => api.patch(`/auth/staff/${id}/`, data),
+  // Nouveau mot de passe provisoire envoyé par e-mail (changement obligatoire à la connexion)
+  renvoyer: (id)     => api.post(`/auth/staff/${id}/renvoyer/`),
 }
 
 // ── Rendez-vous ───────────────────────────

@@ -29,7 +29,7 @@ export const STAFF_ROLES   = [ROLES.ADMIN, ROLES.JUGE, ROLES.GREFFIER, ROLES.ACC
 export const CITOYEN_ROLES = [ROLES.CITOYEN, ROLES.AVOCAT]
 
 /** Page où l'utilisateur doit définir son mot de passe (mot de passe temporaire) */
-export const PAGE_MOT_DE_PASSE = '/mot-de-passe'
+export const PAGE_MOT_DE_PASSE = '/changer-mot-de-passe'
 
 /** Page d'accueil selon le rôle (null = rôle non pris en charge) */
 export function homePathFor(role) {

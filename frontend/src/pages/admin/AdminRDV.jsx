@@ -36,7 +36,7 @@ function annoncerSMS(res, action) {
   if (sms === 'envoye') toast.success(`RDV ${action} — SMS envoye au citoyen`)
   else if (sms === 'non_configure') toast(`RDV ${action}. SMS non envoye : Twilio n'est pas configure.`, { icon: '⚠️' })
   else if (sms === 'numero_invalide') toast(`RDV ${action}. Le citoyen n'a pas de numero valide pour le SMS.`, { icon: '⚠️' })
-  else toast.error(`RDV ${action}, mais le SMS a echoue : ${sms_erreur || 'erreur Twilio'}`)
+  else toast.error(`RDV ${action}, mais le SMS a echoue : ${sms_erreur || 'erreur du service SMS'}`)
 }
 
 export default function AdminRDV() {
