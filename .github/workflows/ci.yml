@@ -1,5 +1,7 @@
-name: SunuTribunal CI/CD
+name: SunuTribunal CI
 
+# Le déploiement est fait par Railway (connecté au dépôt GitHub, option « Wait for CI ») :
+# chaque push sur main est redéployé seulement si ces vérifications passent.
 on:
   push:
     branches: [main, develop]
@@ -7,7 +9,7 @@ on:
     branches: [main]
 
 jobs:
-  # ── Frontend Tests & Build ─────────────────────
+  # ── Frontend : build ───────────────────────────
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -20,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -30,13 +32,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-
-  # ── Backend Tests ──────────────────────────────
+  # ── Backend : tests sur PostgreSQL ─────────────
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -45,9 +41,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:17
         env:
-          POSTGRES_DB: sunutribunal_test
+          POSTGRES_DB: sunutribunal
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -58,51 +54,31 @@ jobs:
         ports:
           - 5432:5432
 
+    env:
+      SECRET_KEY: cle-de-test-ci
+      DEBUG: 'False'
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sunutribunal
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
           cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run migrations
-        run: python manage.py migrate
-        env:
-          SECRET_KEY: test-secret-key
-          DEBUG: 'True'
-          DB_NAME: sunutribunal_test
-          DB_USER: postgres
-          DB_PASSWORD: postgres
-          DB_HOST: localhost
-          DB_PORT: '5432'
+      - name: Check deploy settings
+        run: python manage.py check --deploy --fail-level ERROR
+
+      - name: Create tables (comme backend/start.sh)
+        run: |
+          python manage.py migrate auth --noinput
+          python manage.py migrate --run-syncdb --noinput
 
       - name: Run tests
-        run: python manage.py test --verbosity=2
-        env:
-          SECRET_KEY: test-secret-key
-          DEBUG: 'True'
-          DB_NAME: sunutribunal_test
-          DB_USER: postgres
-          DB_PASSWORD: postgres
-          DB_HOST: localhost
-          DB_PORT: '5432'
-
-  # ── Deploy to Railway (on main branch) ────────
-  deploy:
-    needs: [frontend, backend]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy to Railway
-        uses: bervProject/railway-deploy@main
-        with:
-          railway_token: ${{ secrets.RAILWAY_TOKEN }}
-          service: sunutribunal-backend
+        run: python manage.py test apps

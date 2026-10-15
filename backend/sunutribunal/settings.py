@@ -1,18 +1,27 @@
 """
 SunuTribunal — Django Settings
-Backend: Django 4.2 + DRF + JWT + PostgreSQL
+Backend: Django 6 + DRF + JWT
+Base : SQLite sur le PC de développement, PostgreSQL en production (DATABASE_URL).
 """
 import environ
 from pathlib import Path
 from datetime import timedelta
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-env = environ.Env(DEBUG=(bool, False))
+env = environ.Env()
 environ.Env.read_env(BASE_DIR / '.env')
 
+# Production = une base PostgreSQL est fournie (Railway, Docker). Sans DATABASE_URL,
+# on est sur le PC de développement : SQLite et DEBUG activé par défaut.
+DATABASE_URL = env('DATABASE_URL', default='')
+DEBUG = env.bool('DEBUG', default=not DATABASE_URL)
 
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-sunutribunal-change-in-production')
-DEBUG = env('DEBUG', default=True)
+CLE_DE_DEVELOPPEMENT = 'django-insecure-sunutribunal-change-in-production'
+SECRET_KEY = env('SECRET_KEY', default=CLE_DE_DEVELOPPEMENT)
+if not DEBUG and SECRET_KEY == CLE_DE_DEVELOPPEMENT:
+    raise ImproperlyConfigured('SECRET_KEY doit être définie en production (variable d\'environnement).')
+
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
@@ -21,8 +30,9 @@ ALLOWED_HOSTS = [
     'untainted-giving-moustache.ngrok-free.dev',
     '.ngrok-free.dev',     # tout domaine ngrok (si le lien change)
     '.ngrok-free.app',
-    '.up.railway.app',     # déploiement Railway (après la soutenance)
-]
+    '.up.railway.app',     # déploiement Railway
+    'healthcheck.railway.app',  # vérification de santé Railway après chaque déploiement
+] + env.list('ALLOWED_HOSTS', default=[])   # ex. domaine personnalisé en production
 # ── Applications ───────────────────────────
 DJANGO_APPS = [
     'django.contrib.admin',
@@ -79,13 +89,18 @@ TEMPLATES = [{
 
 WSGI_APPLICATION = 'sunutribunal.wsgi.application'
 
-# ── Database — PostgreSQL ──────────────────
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# ── Base de données ────────────────────────
+# DATABASE_URL (ex. postgresql://user:mdp@hote:5432/nom) est fournie par Railway / Docker.
+if DATABASE_URL:
+    DATABASES = {'default': env.db('DATABASE_URL')}
+    DATABASES['default']['CONN_MAX_AGE'] = 60
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
 
 # ── Auth ───────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
@@ -98,6 +113,9 @@ AUTH_PASSWORD_VALIDATORS = [
 import sys
 if 'test' in sys.argv:
     PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+    # Base de test créée en une passe, apps Django comprises : sous PostgreSQL,
+    # accounts_user pointe vers auth_group, qui doit exister avant les clés étrangères
+    MIGRATION_MODULES = {app: None for app in ('admin', 'auth', 'contenttypes', 'sessions')}
 
 # ── REST Framework ─────────────────────────
 REST_FRAMEWORK = {
@@ -135,13 +153,16 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://localhost',   # APK Android (Capacitor, androidScheme https)
     'https://untainted-giving-moustache.ngrok-free.dev',
-]
+] + env.list('CORS_ORIGINS', default=[])   # en production : l'adresse du frontend déployé
 CORS_ALLOW_CREDENTIALS = True
 # Connexion à Django Admin via le tunnel ngrok (HTTPS)
-CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.dev', 'https://*.ngrok-free.app']
+CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.dev', 'https://*.ngrok-free.app'] \
+    + env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
-CORS_ALLOW_ALL_ORIGINS = True
+# Toutes les origines seulement en développement (téléphone sur le Wi-Fi, ngrok…)
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -165,13 +186,21 @@ CORS_ALLOW_HEADERS = [
 # ngrok / Railway transmettent la requête en http : on garde https dans les liens
 # des fichiers (pièces scannées), sinon l'APK les bloque (contenu mixte)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+if not DEBUG:
+    # Cookies (Django Admin) uniquement en HTTPS
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 # ── Static & Media ─────────────────────────
 STATIC_URL  = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL   = '/media/'
-MEDIA_ROOT  = BASE_DIR / 'media'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# En production, MEDIA_ROOT pointe vers un volume persistant (ex. /app/media sur Railway)
+MEDIA_ROOT  = env('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
+STORAGES = {
+    'default':     {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
+}
 
 # ── Internationalisation ───────────────────
 LANGUAGE_CODE = 'fr-sn'

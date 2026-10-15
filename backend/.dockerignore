@@ -1,0 +1,9 @@
+# Environnement local Windows : jamais dans l'image
+venv
+.env
+db.sqlite3
+db.sqlite3.sauvegarde-*
+media
+staticfiles
+__pycache__
+*.pyc

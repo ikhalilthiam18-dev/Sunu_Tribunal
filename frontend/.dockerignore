@@ -3,3 +3,6 @@ node_modules
 dist
 android
 .git
+# Le .env local contient l'URL ngrok : en production, VITE_API_URL est passée au build
+.env
+.env.*
