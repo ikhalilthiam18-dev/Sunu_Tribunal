@@ -1,12 +1,13 @@
 import os
 from rest_framework import serializers
+from sunutribunal.fichiers import FichiersProteges
 from .models import CourrierCitoyen
 
 EXTENSIONS_AUTORISEES = {'.pdf', '.jpg', '.jpeg', '.png', '.webp'}
 TAILLE_MAX = 10 * 1024 * 1024  # 10 Mo
 
 
-class CourrierCitoyenSerializer(serializers.ModelSerializer):
+class CourrierCitoyenSerializer(FichiersProteges, serializers.ModelSerializer):
     citoyen_nom       = serializers.CharField(source='citoyen.full_name', read_only=True)
     citoyen_email     = serializers.CharField(source='citoyen.email', read_only=True)
     tribunal_nom      = serializers.CharField(source='tribunal.nom', read_only=True, default='')

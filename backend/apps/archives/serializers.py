@@ -1,9 +1,10 @@
 from rest_framework import serializers
 from apps.accounts.models import User
+from sunutribunal.fichiers import FichiersProteges
 from .models import DossierArchive, PieceArchive, HistoriqueDossier
 
 
-class PieceArchiveSerializer(serializers.ModelSerializer):
+class PieceArchiveSerializer(FichiersProteges, serializers.ModelSerializer):
     type_label     = serializers.CharField(source='get_type_piece_display', read_only=True)
     ajoute_par_nom = serializers.SerializerMethodField()
     extension      = serializers.CharField(read_only=True)

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from sunutribunal.fichiers import FichiersProteges
 from .models import Courrier, Transmission
 
 
@@ -21,7 +22,7 @@ class TransmissionSerializer(serializers.ModelSerializer):
         return obj.agent.full_name if obj.agent else ''
 
 
-class CourrierSerializer(serializers.ModelSerializer):
+class CourrierSerializer(FichiersProteges, serializers.ModelSerializer):
     sens_label     = serializers.CharField(source='get_sens_display', read_only=True)
     registre_label = serializers.CharField(source='get_registre_display', read_only=True)
     statut_label   = serializers.CharField(source='get_statut_display', read_only=True)

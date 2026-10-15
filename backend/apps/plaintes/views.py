@@ -11,6 +11,7 @@ from .models import Plainte, PieceJointe, MessageDossier, EvenementPlainte
 from apps.accounts.models import User, STAFF_ROLES
 from apps.accounts.permissions import HasRole
 from apps.notifications.services import notifier, notifier_personnel
+from sunutribunal.fichiers import FichiersProteges
 
 # Pièces justificatives acceptées (fichiers importés ou photos « Scanner document »)
 EXTENSIONS_AUTORISEES = {'.pdf', '.jpg', '.jpeg', '.png', '.webp', '.heic', '.doc', '.docx'}
@@ -21,7 +22,7 @@ ROLES_GREFFE = ('admin', 'greffier')
 
 
 # ── Serializers ───────────────────────────────────────
-class PieceJointeSerializer(serializers.ModelSerializer):
+class PieceJointeSerializer(FichiersProteges, serializers.ModelSerializer):
     class Meta:
         model  = PieceJointe
         fields = ['id','nom','fichier','taille','uploaded_at']

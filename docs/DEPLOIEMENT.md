@@ -103,7 +103,9 @@ Superutilisateur : `docker compose exec backend python manage.py createsuperuser
 
 ## Limites connues
 
-- Les fichiers de `/media/` (scans) sont servis par Django à toute personne qui connaît leur adresse,
-  comme en développement. Pour des pièces sensibles, prévoir plus tard un accès contrôlé.
+- Les scans ne sont jamais publics : l'API donne des liens signés valables 1 heure
+  (`backend/sunutribunal/fichiers.py`), seulement à qui voit le dossier. Un lien copié reste
+  utilisable par n'importe qui pendant cette heure. `/media/` est réservé aux comptes de Django Admin.
+- Changer `SECRET_KEY` invalide tous les liens en cours (il suffit de recharger la page).
 - SQLite local et PostgreSQL de production sont deux bases distinctes : les comptes créés en local
   ne sont pas copiés.

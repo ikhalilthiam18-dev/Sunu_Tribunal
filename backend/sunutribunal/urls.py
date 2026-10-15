@@ -1,9 +1,11 @@
 from django.contrib import admin
+from django.contrib.admin.views.decorators import staff_member_required
 from django.urls import path, re_path, include
 from django.conf import settings
 from django.views.static import serve
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import home_view
+from .fichiers import telecharger
 
 urlpatterns = [
     path('',              home_view,            name='home'),
@@ -19,6 +21,8 @@ urlpatterns = [
     path('api/correspondances/', include('apps.correspondances.urls')),
     path('api/stats/',     include('sunutribunal.stats')),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    # Fichiers envoyés (scans) : servis par Django aussi en production (static() ne marche qu'avec DEBUG)
-    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    # Fichiers envoyés (scans) : jamais publics. L'API donne des liens signés (sunutribunal/fichiers.py) ;
+    # /media/ reste ouvert aux seuls comptes connectés à Django Admin (liens de fichiers de l'admin).
+    path('api/fichiers/<str:jeton>/', telecharger, name='fichier_protege'),
+    re_path(r'^media/(?P<path>.*)$', staff_member_required(serve), {'document_root': settings.MEDIA_ROOT}),
 ]
