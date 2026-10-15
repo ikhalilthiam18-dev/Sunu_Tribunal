@@ -9,7 +9,7 @@ import { Capacitor } from '@capacitor/core'
 
 // URL publique du backend (ngrok aujourd'hui, Railway demain)
 const URL_PUBLIQUE =
-  import.meta.env.VITE_API_URL || 'https://suffering-zestfully-treason.ngrok-free.dev/api'
+  import.meta.env.VITE_API_URL || 'https://untainted-giving-moustache.ngrok-free.dev/api'
 
 function resoudreApiBase() {
   // 1. Application Android (APK Capacitor) : l'app tourne sur https://localhost,

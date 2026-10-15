@@ -17,7 +17,7 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '10.20.3.214',
-    'suffering-zestfully-treason.ngrok-free.dev',
+    'untainted-giving-moustache.ngrok-free.dev',
     '.ngrok-free.dev',     # tout domaine ngrok (si le lien change)
     '.ngrok-free.app',
     '.up.railway.app',     # déploiement Railway (après la soutenance)
@@ -134,9 +134,11 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'https://suffering-zestfully-treason.ngrok-free.dev',
+    'https://untainted-giving-moustache.ngrok-free.dev',
 ]
 CORS_ALLOW_CREDENTIALS = True
+# Connexion à Django Admin via le tunnel ngrok (HTTPS)
+CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.dev', 'https://*.ngrok-free.app']
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_METHODS = [

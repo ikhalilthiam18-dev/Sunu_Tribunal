@@ -1,0 +1,5 @@
+# Dépendances et builds locaux (Windows) : reconstruits dans l'image
+node_modules
+dist
+android
+.git
