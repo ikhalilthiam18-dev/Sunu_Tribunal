@@ -17,6 +17,7 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '10.20.3.214',
+    '192.168.1.14',        # PC sur le Wi-Fi de la maison (tests sur téléphone)
     'untainted-giving-moustache.ngrok-free.dev',
     '.ngrok-free.dev',     # tout domaine ngrok (si le lien change)
     '.ngrok-free.app',
