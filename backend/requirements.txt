@@ -12,3 +12,4 @@ twilio>=9,<10
 requests==2.34.2   # envoi des e-mails par l'API Brevo (apps/accounts/brevo.py)
 gunicorn
 psycopg[binary]>=3.2,<4   # PostgreSQL en production (DATABASE_URL)
+django-storages[s3]==1.14.6   # scans dans Cloudflare R2 (hébergement gratuit, disque effacé)

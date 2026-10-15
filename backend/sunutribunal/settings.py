@@ -32,6 +32,7 @@ ALLOWED_HOSTS = [
     '.ngrok-free.app',
     '.up.railway.app',     # déploiement Railway
     'healthcheck.railway.app',  # vérification de santé Railway après chaque déploiement
+    '.onrender.com',       # hébergement gratuit du backend (Render)
 ] + env.list('ALLOWED_HOSTS', default=[])   # ex. domaine personnalisé en production
 # ── Applications ───────────────────────────
 DJANGO_APPS = [
@@ -94,6 +95,8 @@ WSGI_APPLICATION = 'sunutribunal.wsgi.application'
 if DATABASE_URL:
     DATABASES = {'default': env.db('DATABASE_URL')}
     DATABASES['default']['CONN_MAX_AGE'] = 60
+    # Neon (gratuit) coupe les connexions quand la base se met en veille : on vérifie avant usage
+    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
 else:
     DATABASES = {
         'default': {
@@ -201,6 +204,23 @@ STORAGES = {
     'default':     {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
 }
+# Scans dans un stockage S3 (Cloudflare R2) quand l'hébergeur n'a pas de disque permanent (Render gratuit).
+# Le compartiment reste privé : les fichiers passent par les liens signés de sunutribunal/fichiers.py.
+S3_BUCKET = env('S3_BUCKET', default='')
+if S3_BUCKET:
+    STORAGES['default'] = {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            'bucket_name':       S3_BUCKET,
+            'endpoint_url':      env('S3_ENDPOINT_URL'),   # R2 : https://<id-compte>.r2.cloudflarestorage.com
+            'access_key':        env('S3_ACCESS_KEY_ID'),
+            'secret_key':        env('S3_SECRET_ACCESS_KEY'),
+            'region_name':       env('S3_REGION', default='auto'),
+            'signature_version': 's3v4',
+            'default_acl':       None,
+            'file_overwrite':    False,
+        },
+    }
 
 # ── Internationalisation ───────────────────
 LANGUAGE_CODE = 'fr-sn'

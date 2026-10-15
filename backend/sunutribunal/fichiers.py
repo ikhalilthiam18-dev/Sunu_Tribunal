@@ -9,8 +9,9 @@ Le lien s'ouvre directement (<a href>, APK) : pas besoin d'en-tête Authorizatio
 import mimetypes
 import os
 
+from django.contrib.admin.views.decorators import staff_member_required
 from django.core import signing
-from django.core.exceptions import SuspiciousFileOperation
+from django.core.exceptions import SuspiciousOperation
 from django.core.files.storage import default_storage
 from django.db import models
 from django.http import FileResponse, Http404, HttpResponse
@@ -39,9 +40,23 @@ def telecharger(request, jeton):
                             status=410, content_type='text/plain; charset=utf-8')
     except signing.BadSignature:
         raise Http404
+    return reponse_fichier(nom)
+
+
+@staff_member_required
+def media_admin(request, path):
+    """GET /media/<chemin> — liens de fichiers de Django Admin, réservés aux comptes de l'admin."""
+    return reponse_fichier(path)
+
+
+def reponse_fichier(nom):
+    """Sert un fichier du stockage (disque local ou Cloudflare R2)."""
+    # Chemin hors du stockage (« ../ ») ou fichier absent → 404
     try:
+        if not default_storage.exists(nom):
+            raise Http404
         fichier = default_storage.open(nom, 'rb')
-    except (FileNotFoundError, SuspiciousFileOperation):
+    except (FileNotFoundError, SuspiciousOperation):
         raise Http404
 
     type_mime = mimetypes.guess_type(nom)[0] or 'application/octet-stream'

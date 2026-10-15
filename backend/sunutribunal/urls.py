@@ -1,11 +1,8 @@
 from django.contrib import admin
-from django.contrib.admin.views.decorators import staff_member_required
 from django.urls import path, re_path, include
-from django.conf import settings
-from django.views.static import serve
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import home_view
-from .fichiers import telecharger
+from .fichiers import telecharger, media_admin
 
 urlpatterns = [
     path('',              home_view,            name='home'),
@@ -24,5 +21,5 @@ urlpatterns = [
     # Fichiers envoyés (scans) : jamais publics. L'API donne des liens signés (sunutribunal/fichiers.py) ;
     # /media/ reste ouvert aux seuls comptes connectés à Django Admin (liens de fichiers de l'admin).
     path('api/fichiers/<str:jeton>/', telecharger, name='fichier_protege'),
-    re_path(r'^media/(?P<path>.*)$', staff_member_required(serve), {'document_root': settings.MEDIA_ROOT}),
+    re_path(r'^media/(?P<path>.*)$', media_admin),
 ]

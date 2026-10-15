@@ -10,6 +10,7 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
+from apps.plaintes.models import PieceJointe
 from apps.rdv.models import Tribunal
 from sunutribunal.fichiers import lien_signe
 
@@ -66,8 +67,7 @@ class FichiersProtegesTests(APITestCase):
 
     def test_media_ferme_au_public_ouvert_a_django_admin(self):
         self._deposer()
-        nom = default_storage.listdir('plaintes/pieces')[1][0]
-        url = f'/media/plaintes/pieces/{nom}'
+        url = '/media/' + PieceJointe.objects.get().fichier.name
 
         r = self.client.get(url)                       # anonyme : renvoyé vers la connexion de l'admin
         self.assertEqual(r.status_code, 302)
@@ -77,7 +77,9 @@ class FichiersProtegesTests(APITestCase):
         self.assertEqual(self.client.get(url).status_code, 302)
 
         self.client.force_login(self.admin_django)
-        self.assertEqual(self.client.get(url).status_code, 200)
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(b''.join(r.streaming_content), CONTENU_SCAN)
 
     def test_lien_modifie_refuse(self):
         url = self._chemin(self._deposer()['pieces'][0]['fichier'])
