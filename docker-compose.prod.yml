@@ -1,0 +1,102 @@
+# SunuTribunal — production sur le VPS OVHcloud (guide : docs/DEPLOIEMENT.md)
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# Seul Caddy est exposé (ports 80/443) ; la base et le backend restent internes.
+
+name: sunutribunal
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sunutribunal
+      POSTGRES_USER: sunutribunal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env.production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sunutribunal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Django Backend ─────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env.production        # SECRET_KEY, clés Groq / Brevo / Twilio…
+    environment:
+      DATABASE_URL: postgresql://sunutribunal:${POSTGRES_PASSWORD}@db:5432/sunutribunal
+      ALLOWED_HOSTS: api.${DOMAINE:?DOMAINE manquant dans .env.production}
+      CORS_ORIGINS: https://${DOMAINE}
+      FRONTEND_URL: https://${DOMAINE}
+      MEDIA_ROOT: /app/media
+    volumes:
+      - media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── React Frontend ─────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: https://api.${DOMAINE}/api
+    restart: unless-stopped
+
+  # ── Caddy : HTTPS automatique ──────────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAINE: ${DOMAINE}
+      EMAIL_ADMIN: ${EMAIL_ADMIN:?EMAIL_ADMIN manquant dans .env.production}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
+  # ── Sauvegarde quotidienne (base + scans), 14 jours gardés ──
+  sauvegarde:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./sauvegardes:/sauvegardes
+      - media:/media:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        sleep 600   # laisser le backend créer les tables au premier démarrage
+        while true; do
+          j=$$(date +%Y-%m-%d_%H%M)
+          if pg_dump -h db -U sunutribunal sunutribunal | gzip > /sauvegardes/base_$$j.sql.gz \
+             && tar czf /sauvegardes/scans_$$j.tar.gz -C /media .; then
+            echo "Sauvegarde $$j OK"
+          else
+            echo "Sauvegarde $$j EN ÉCHEC"
+          fi
+          find /sauvegardes -name '*.gz' -mtime +14 -delete
+          sleep 86400
+        done
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  media:
+  caddy_data:
+  caddy_config:

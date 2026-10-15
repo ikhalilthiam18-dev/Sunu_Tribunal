@@ -1,0 +1,23 @@
+# SunuTribunal — porte d'entrée HTTPS du VPS (certificats Let's Encrypt automatiques)
+# DOMAINE et EMAIL_ADMIN viennent de .env.production
+
+{
+	email {$EMAIL_ADMIN}
+}
+
+# Site public (frontend React)
+{$DOMAINE} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy frontend:80
+}
+
+# API Django + Django Admin
+api.{$DOMAINE} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000"
+	request_body {
+		max_size 25MB
+	}
+	reverse_proxy backend:8000
+}

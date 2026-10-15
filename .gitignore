@@ -25,6 +25,10 @@ backend/.env
 .docker/
 postgres_data/
 
+# ── Production (VPS) ────────────────────────────
+.env.production
+sauvegardes/
+
 # ── IDE ─────────────────────────────────────────
 .vscode/
 .idea/

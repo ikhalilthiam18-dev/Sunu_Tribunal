@@ -1,7 +1,7 @@
 name: SunuTribunal CI
 
-# Le déploiement est fait par Railway (connecté au dépôt GitHub, option « Wait for CI ») :
-# chaque push sur main est redéployé seulement si ces vérifications passent.
+# Vérifications de chaque push. Déploiement sur le VPS seulement quand elles passent :
+# git pull + docker compose (docs/DEPLOIEMENT.md, étape 7).
 on:
   push:
     branches: [main, develop]
