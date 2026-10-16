@@ -12,6 +12,9 @@ function distanceKm(a, b) {
 }
 const fmtDistance = (km) => km < 10 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`
 
+// Recherche tolérante : « Thiès » trouve « Thies », sans tenir compte des majuscules
+const sansAccents = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
 // Tribunaux de la base (Django Admin) → format de la carte
 const versCarte = (t) => ({
   id: t.id, nom: t.nom, adresse: t.adresse, tel: t.telephone, heures: t.heures_ouverture,
@@ -68,11 +71,14 @@ export default function CartePage() {
     })
   }, [cartePrete, tribunaux])
 
+  // Chaque mot tapé doit figurer dans le nom ou l'adresse, dans n'importe quel ordre
+  const mots = sansAccents(search).split(/\s+/).filter(Boolean)
   const filtered = tribunaux
     .map(t => ({ ...t, km: position && t.lat !== null ? distanceKm(position, t) : null }))
-    .filter(t =>
-      t.nom.toLowerCase().includes(search.toLowerCase()) ||
-      t.adresse.toLowerCase().includes(search.toLowerCase()))
+    .filter(t => {
+      const texte = sansAccents(`${t.nom} ${t.adresse}`)
+      return mots.every(m => texte.includes(m))
+    })
     .sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity))
 
   const flyTo = (t) => {
@@ -98,6 +104,13 @@ export default function CartePage() {
 
       {/* List */}
       <div className="space-y-3">
+        {filtered.length === 0 && (
+          <div className="card text-center text-sm text-gray-500 py-8">
+            {tribunaux.length === 0
+              ? 'Aucun tribunal enregistré pour le moment.'
+              : `Aucun tribunal ne correspond à « ${search.trim()} ».`}
+          </div>
+        )}
         {filtered.map(t => (
           <div key={t.id}
             onClick={() => flyTo(t)}
