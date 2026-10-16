@@ -10,6 +10,9 @@ python manage.py migrate --run-syncdb --noinput
 # Premier compte (hébergeur sans terminal) : rien à faire sans DJANGO_SUPERUSER_EMAIL / _PASSWORD
 python manage.py creer_superutilisateur
 
+# Tribunaux de base (carte, rendez-vous) sur une base neuve ; les existants ne sont pas modifiés
+python manage.py charger_tribunaux
+
 exec gunicorn sunutribunal.wsgi:application \
     --bind "0.0.0.0:${PORT:-8000}" \
     --workers "${GUNICORN_WORKERS:-3}" \

@@ -1,15 +1,15 @@
 /**
  * SunuTribunal — Configuration centrale de l'URL du backend
  * ----------------------------------------------------------
- * UN SEUL endroit à modifier quand le lien ngrok change
- * ou lors du passage à Railway : la variable VITE_API_URL
+ * UN SEUL endroit à modifier quand l'adresse du backend change
+ * (Render, nom de domaine, VPS) : la variable VITE_API_URL
  * dans frontend/.env (puis relancer npm run dev / npm run build).
  */
 import { Capacitor } from '@capacitor/core'
 
-// URL publique du backend (ngrok aujourd'hui, Railway demain)
+// URL publique du backend (Render aujourd'hui, nom de domaine demain)
 const URL_PUBLIQUE =
-  import.meta.env.VITE_API_URL || 'https://untainted-giving-moustache.ngrok-free.dev/api'
+  import.meta.env.VITE_API_URL || 'https://sunutribunal-api.onrender.com/api'
 
 function resoudreApiBase() {
   // 1. Application Android (APK Capacitor) : l'app tourne sur https://localhost,
