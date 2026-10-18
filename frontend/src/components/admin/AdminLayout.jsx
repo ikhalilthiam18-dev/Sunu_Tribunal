@@ -8,6 +8,7 @@ import { useAuth, ROLE_LABELS } from '../../context/AuthContext.jsx'
 import { useCompteurs } from '../../context/CompteursContext.jsx'
 import { Sidebar, TiroirMobile, useSidebarRepliable } from '../common/SidebarRepliable.jsx'
 import AssistantAdmin from '../admin/AssistantAdmin.jsx'
+import Logo from '../common/Logo.jsx'
 import toast from 'react-hot-toast'
 
 // roles : qui voit le lien (absent = tout le personnel)
@@ -66,7 +67,7 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex hauteur-ecran bg-gray-50">
 
       {/* Ordinateur : menu repliable (clic sur le logo) */}
       <Sidebar {...proprietesMenu} />
@@ -85,6 +86,7 @@ export default function AdminLayout() {
             aria-label="Ouvrir le menu" aria-expanded={menu.mobileOuvert}>
             <FiMenu className="w-6 h-6 text-gray-600" />
           </button>
+          <Logo fond="clair" size="sm" className="lg:hidden ml-3 min-w-0" />
           <div className="hidden lg:block">
             <p className="text-xs text-gray-400 uppercase tracking-wide">
               Tribunal de Grande Instance
@@ -112,7 +114,8 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        {/* pb mobile : la fin de la page reste visible au-dessus du bouton de l'assistant */}
+        <main className="flex-1 overflow-y-auto pb-24 lg:pb-0">
           <Outlet />
         </main>
       </div>

@@ -97,7 +97,8 @@ export default function AssistantJuridique() {
       {/* Bouton flottant */}
       <button
         onClick={() => setOuvert(!ouvert)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-justice-500 text-white shadow-2xl flex items-center justify-center hover:bg-justice-400 transition-all active:scale-95"
+        // Mobile / APK : au-dessus de la barre de navigation du bas, sans la recouvrir
+        className="fixed bottom-[4.75rem] right-4 lg:bottom-6 lg:right-6 z-50 w-14 h-14 rounded-full bg-justice-500 text-white shadow-2xl flex items-center justify-center hover:bg-justice-400 transition-all active:scale-95"
         style={{ animation: ouvert ? 'none' : 'pulse-sos 3s infinite' }}>
         {ouvert
           ? <FiX className="w-6 h-6" />
@@ -107,8 +108,8 @@ export default function AssistantJuridique() {
 
       {/* Fenetre chat */}
       {ouvert && (
-        <div className="fixed bottom-24 right-6 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-slide-in"
-          style={{ height: '480px' }}>
+        <div className="fixed inset-x-3 bottom-[8.5rem] lg:inset-x-auto lg:right-6 lg:bottom-24 lg:w-80 z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-slide-in"
+          style={{ height: 'min(480px, calc(100vh - 12rem))' }}>
 
           {/* Header */}
           <div className="bg-justice-500 px-4 py-3 flex items-center justify-between">

@@ -210,7 +210,8 @@ export function Sidebar({
 export function TiroirMobile({ ouvert, fermer, children }) {
   if (!ouvert) return null
   return (
-    <div className="lg:hidden fixed inset-0 z-40">
+    // z-[60] : au-dessus du bouton flottant de l'assistant (z-50), masqué par le voile quand le menu est ouvert
+    <div className="lg:hidden fixed inset-0 z-[60]">
       <div className="absolute inset-0 bg-black/50" onClick={fermer} aria-hidden="true" />
       {children}
     </div>

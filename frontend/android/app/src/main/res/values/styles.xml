@@ -13,6 +13,8 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Zones de la barre d'état et de la barre de navigation : Encre (icônes claires, capacitor.config.json) -->
+        <item name="android:windowBackground">@color/encre</item>
     </style>
 
 

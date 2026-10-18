@@ -85,7 +85,7 @@ export default function AssistantAdmin() {
       {/* Bouton flottant admin */}
       <button
         onClick={() => setOuvert(!ouvert)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-navy-700 text-white shadow-2xl flex items-center justify-center hover:bg-navy-600 transition-all active:scale-95"
+        className="fixed bottom-5 right-4 lg:bottom-6 lg:right-6 z-50 w-14 h-14 rounded-full bg-navy-700 text-white shadow-2xl flex items-center justify-center hover:bg-navy-600 transition-all active:scale-95"
         title="Assistant du greffe" aria-label="Assistant du greffe">
         {ouvert
           ? <FiX className="w-6 h-6" />
@@ -96,7 +96,7 @@ export default function AssistantAdmin() {
       {/* Fenetre chat */}
       {ouvert && (
         <div className="fixed bottom-24 right-4 sm:right-6 z-50 w-[min(24rem,calc(100vw-2rem))] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-slide-in"
-          style={{ height: '520px' }}>
+          style={{ height: 'min(520px, calc(100vh - 8rem))' }}>
 
           {/* Header */}
           <div className="bg-navy-700 px-4 py-3 flex items-center justify-between">

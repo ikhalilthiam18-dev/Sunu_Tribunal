@@ -155,6 +155,10 @@
   .font-display.text-2xl { font-size: 2rem;     line-height: 2.375rem; }
   .font-display.text-lg  { font-size: 1.375rem; line-height: 1.75rem; }
   .font-display.text-xl  { font-size: 1.5rem;   line-height: 1.875rem; }
+
+  /* Hauteur réellement visible : 100vh compte la barre d'adresse des navigateurs mobiles
+     (la barre du bas passait dessous). 100vh reste en repli pour les anciens WebView Android. */
+  .hauteur-ecran { height: 100vh; height: 100dvh; }
 }
 
 /* ── Leaflet overrides ── */

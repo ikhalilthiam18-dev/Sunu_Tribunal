@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { FiNavigation, FiPhone, FiClock } from 'react-icons/fi'
 import toast from 'react-hot-toast'
+import 'leaflet/dist/leaflet.css'   // intégrée au build : la carte de l'APK ne dépend pas d'un site externe
 import { tribunalAPI, liste, messageErreur } from '../../services/api.js'
 
 // Distance à vol d'oiseau (km) entre la position du citoyen et un tribunal
@@ -43,7 +44,9 @@ export default function CartePage() {
 
   useEffect(() => {
     if (mapInst.current) return
+    let annule = false   // page quittée (ou montée deux fois) avant le chargement de Leaflet
     import('leaflet').then(L => {
+      if (annule || mapInst.current || !mapRef.current) return
       mapInst.current = L.map(mapRef.current, {
         center: [14.6928, -17.4467], zoom: 12
       })
@@ -52,7 +55,10 @@ export default function CartePage() {
       }).addTo(mapInst.current)
       setCartePrete(true)
     })
-    return () => { if (mapInst.current) { mapInst.current.remove(); mapInst.current = null } }
+    return () => {
+      annule = true
+      if (mapInst.current) { mapInst.current.remove(); mapInst.current = null }
+    }
   }, [])
 
   // Marqueurs : créés quand la carte et la liste des tribunaux sont prêtes (affichés selon la recherche, plus bas)

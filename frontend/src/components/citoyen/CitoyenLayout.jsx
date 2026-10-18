@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   FiHome, FiCalendar, FiFileText, FiMapPin, FiBell,
-  FiAlertTriangle, FiMenu, FiMail
+  FiAlertTriangle, FiMenu, FiMail, FiFolder
 } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useCompteurs } from '../../context/CompteursContext.jsx'
@@ -14,7 +14,7 @@ const navItems = [
   { to: '/citoyen',          icon: FiHome,      label: 'Accueil',      exact: true },
   { to: '/citoyen/rdv',      icon: FiCalendar,  label: 'RDV'               },
   { to: '/citoyen/plainte',  icon: FiFileText,  label: 'Plainte'           },
-  { to: '/citoyen/suivi',    icon: FiFileText,  label: 'Mes dossiers'      },
+  { to: '/citoyen/suivi',    icon: FiFolder,    label: 'Mes dossiers'      },
   { to: '/citoyen/courrier', icon: FiMail,      label: 'Courriers',     badge: 'courriers' },
   { to: '/citoyen/carte',    icon: FiMapPin,    label: 'Carte'             },
   { to: '/citoyen/notifs',   icon: FiBell,      label: 'Notifications', badge: 'notifs' },
@@ -24,7 +24,7 @@ const bottomNav = [
   { to: '/citoyen',         icon: FiHome,     label: 'Accueil', exact: true },
   { to: '/citoyen/rdv',     icon: FiCalendar, label: 'RDV'                 },
   { to: '/citoyen/plainte', icon: FiFileText, label: 'Plainte'             },
-  { to: '/citoyen/suivi',   icon: FiFileText, label: 'Mes dossiers'        },
+  { to: '/citoyen/suivi',   icon: FiFolder,   label: 'Mes dossiers', court: 'Dossiers' },
 ]
 
 export default function CitoyenLayout() {
@@ -55,7 +55,7 @@ export default function CitoyenLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex hauteur-ecran bg-gray-50">
 
       {/* Ordinateur : menu repliable (clic sur le logo) */}
       <Sidebar {...proprietesMenu} />
@@ -84,7 +84,8 @@ export default function CitoyenLayout() {
           </NavLink>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        {/* pb mobile : la fin de la page reste visible au-dessus du bouton de l'assistant */}
+        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
           <Outlet />
         </main>
 
@@ -97,7 +98,7 @@ export default function CitoyenLayout() {
                   isActive ? 'text-justice-500' : 'text-gray-400'
                 }`}>
               <item.icon className="w-5 h-5" />
-              {item.label.split(' ')[0]}
+              {item.court || item.label}
             </NavLink>
           ))}
         </nav>
