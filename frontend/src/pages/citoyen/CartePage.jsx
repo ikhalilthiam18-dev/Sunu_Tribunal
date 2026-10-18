@@ -25,6 +25,8 @@ const versCarte = (t) => ({
 export default function CartePage() {
   const mapRef     = useRef(null)
   const mapInst    = useRef(null)
+  const marqueurs  = useRef(new Map())   // id du tribunal → marqueur Leaflet
+  const [versionMarqueurs, setVersionMarqueurs] = useState(0)
   const [selected, setSelected] = useState(null)
   const [search,   setSearch]   = useState('')
   const [tribunaux, setTribunaux] = useState([])
@@ -53,10 +55,12 @@ export default function CartePage() {
     return () => { if (mapInst.current) { mapInst.current.remove(); mapInst.current = null } }
   }, [])
 
-  // Marqueurs : ajoutés quand la carte et la liste des tribunaux sont prêtes
+  // Marqueurs : créés quand la carte et la liste des tribunaux sont prêtes (affichés selon la recherche, plus bas)
   useEffect(() => {
     if (!cartePrete || !mapInst.current) return
     import('leaflet').then(L => {
+      marqueurs.current.forEach(m => m.remove())
+      marqueurs.current.clear()
       tribunaux.filter(t => t.lat !== null && t.lng !== null).forEach(t => {
         const icon = L.divIcon({
           className: '',
@@ -64,10 +68,10 @@ export default function CartePage() {
           iconSize: [28, 28],
           iconAnchor: [14, 28],
         })
-        L.marker([t.lat, t.lng], { icon })
-          .addTo(mapInst.current)
-          .bindPopup(`<strong>${t.nom}</strong><br/>${t.adresse}`)
+        marqueurs.current.set(t.id, L.marker([t.lat, t.lng], { icon })
+          .bindPopup(`<strong>${t.nom}</strong><br/>${t.adresse}`))
       })
+      setVersionMarqueurs(v => v + 1)
     })
   }, [cartePrete, tribunaux])
 
@@ -80,6 +84,24 @@ export default function CartePage() {
       return mots.every(m => texte.includes(m))
     })
     .sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity))
+
+  // La recherche filtre aussi la carte : seuls les tribunaux trouvés gardent leur marqueur,
+  // et la vue se recentre sur eux (zoom sur le tribunal s'il n'y en a qu'un)
+  const idsVisibles = filtered.map(t => t.id).join(',')
+  const rechercheActive = mots.length > 0
+  useEffect(() => {
+    const carte = mapInst.current
+    if (!carte) return
+    const ids = new Set(idsVisibles.split(',').filter(Boolean).map(Number))
+    const positions = []
+    marqueurs.current.forEach((m, id) => {
+      if (ids.has(id)) { m.addTo(carte); positions.push(m.getLatLng()) }
+      else m.remove()
+    })
+    if (!rechercheActive || positions.length === 0) return
+    if (positions.length === 1) carte.flyTo(positions[0], 14, { duration: 0.8 })
+    else carte.flyToBounds(positions, { padding: [40, 40], maxZoom: 13, duration: 0.8 })
+  }, [idsVisibles, rechercheActive, versionMarqueurs])
 
   const flyTo = (t) => {
     setSelected(t.id)
