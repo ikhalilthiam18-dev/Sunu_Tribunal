@@ -25,6 +25,20 @@ class ErreurBrevo(Exception):
         self.message = message
 
 
+class SansServiceEmailBackend(BaseEmailBackend):
+    """
+    Production sans BREVO_API_KEY ni Gmail : refuse d'envoyer. Le greffier en chef voit l'erreur
+    au lieu de « identifiants envoyés », et l'e-mail (avec le mot de passe provisoire) n'est
+    jamais écrit dans le journal du serveur, contrairement au backend « console ».
+    """
+
+    def send_messages(self, email_messages):
+        if email_messages and not self.fail_silently:
+            raise ErreurBrevo("Aucun service d'e-mail n'est configuré sur le serveur "
+                              "(ajouter BREVO_API_KEY dans ses variables d'environnement).")
+        return 0
+
+
 def _adresse(texte):
     nom, email = parseaddr(texte)
     return {'name': nom, 'email': email} if nom else {'email': email}

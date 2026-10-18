@@ -266,8 +266,11 @@ if BREVO_API_KEY:
     EMAIL_BACKEND = 'apps.accounts.brevo.BrevoEmailBackend'
 elif EMAIL_HOST_USER:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-else:
+elif DEBUG:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    # Production sans service d'e-mail : échec visible, jamais de mot de passe dans le journal
+    EMAIL_BACKEND = 'apps.accounts.brevo.SansServiceEmailBackend'
 DEFAULT_FROM_EMAIL  = env('DEFAULT_FROM_EMAIL',
                           default=f'SunuTribunal <{EMAIL_HOST_USER or "noreply@sunutribunal.sn"}>')
 # Adresse de la plateforme mise dans les e-mails (bouton « Accéder à SunuTribunal »)

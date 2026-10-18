@@ -220,6 +220,17 @@ class IdentifiantsParEmailTests(APITestCase):
         self.assertIn('Renvoyer les identifiants', res.data['message'])
         self.assertTrue(User.objects.filter(email='awa.ndiaye@test.sn').exists())
 
+    def test_production_sans_service_email_echec_visible(self):
+        from django.test import override_settings
+        with override_settings(EMAIL_BACKEND='apps.accounts.brevo.SansServiceEmailBackend'), \
+             self.assertLogs('apps.accounts.emails', level='ERROR'):
+            res = self._creer()
+        self.assertEqual(res.status_code, 201)
+        self.assertFalse(res.data['email_envoye'])
+        self.assertIn('BREVO_API_KEY', res.data['email_erreur'])
+        self.assertIn('Renvoyer les identifiants', res.data['message'])
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_echec_du_renvoi_garde_l_ancien_mot_de_passe(self):
         from unittest import mock
         agent_id = self._creer().data['id']
